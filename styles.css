@@ -73,7 +73,12 @@ button {
   width: 100%;
   max-width: 1472px;
   margin: 0 auto;
+  overflow: hidden;
   padding: max(28px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(44px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.app-shell > section {
+  width: 100%;
 }
 
 .app-shell > *,
@@ -429,7 +434,6 @@ select:focus {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  container-type: inline-size;
 }
 
 .registrations-panel,
@@ -1075,8 +1079,7 @@ tbody tr:last-child td {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .dashboard-charts,
-  .workspace {
+  .dashboard-charts {
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -1084,7 +1087,30 @@ tbody tr:last-child td {
   }
 
   .workspace {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     overflow: hidden;
+  }
+
+  .entry-area,
+  .visual-area {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .visual-area {
+    margin-top: 20px;
+  }
+
+  .registrations-panel,
+  .charts-panel {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 }
 
@@ -1096,6 +1122,17 @@ tbody tr:last-child td {
     padding-right: max(12px, env(safe-area-inset-right));
     padding-left: max(12px, env(safe-area-inset-left));
     padding-top: max(16px, env(safe-area-inset-top));
+  }
+
+  .app-shell > section,
+  .workspace,
+  .entry-area,
+  .visual-area,
+  .registrations-panel,
+  .charts-panel {
+    inline-size: 100%;
+    min-inline-size: 0;
+    max-inline-size: 100%;
   }
 
   .topbar {
