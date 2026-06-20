@@ -103,6 +103,10 @@ const els = {
   notes: document.querySelector("#notes"),
   incomeSourceChart: document.querySelector("#incomeSourceChart"),
   incomeSourcesPanel: document.querySelector("#incomeSourcesPanel"),
+  backupPanel: document.querySelector("#backupPanel"),
+  downloadBackup: document.querySelector("#downloadBackup"),
+  restoreBackup: document.querySelector("#restoreBackup"),
+  backupFile: document.querySelector("#backupFile"),
   incomeSourceForm: document.querySelector("#incomeSourceForm"),
   newIncomeSource: document.querySelector("#newIncomeSource"),
   incomeSourcesList: document.querySelector("#incomeSourcesList"),
@@ -197,6 +201,9 @@ function bindEvents() {
   els.createAccount.addEventListener("click", createAccount);
   els.signOut.addEventListener("click", signOut);
   els.syncNow.addEventListener("click", syncNow);
+  els.downloadBackup.addEventListener("click", downloadBackup);
+  els.restoreBackup.addEventListener("click", () => els.backupFile.click());
+  els.backupFile.addEventListener("change", restoreBackup);
 
   document.querySelectorAll("[data-history-filter]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -936,6 +943,7 @@ function renderRegistrationTabs() {
   els.entryForm.classList.toggle("hidden", activeRegistrationTab !== "entry");
   els.incomeSourcesPanel.classList.toggle("hidden", activeRegistrationTab !== "incomeSources");
   els.nameSheetPanel.classList.toggle("hidden", activeRegistrationTab !== "name");
+  els.backupPanel.classList.toggle("hidden", activeRegistrationTab !== "backup");
   renderIncomeSourcesList();
 }
 
@@ -977,6 +985,52 @@ function exportCsv() {
   link.download = "controle-financeiro-lurdes-camargo.csv";
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+function downloadBackup() {
+  const backup = {
+    format: "controle-financeiro-backup",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    state,
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `controle-financeiro-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+async function restoreBackup(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  try {
+    const backup = JSON.parse(await file.text());
+    if (
+      backup?.format !== "controle-financeiro-backup" ||
+      backup?.version !== 1 ||
+      !backup.state ||
+      !Array.isArray(backup.state.entries) ||
+      !Array.isArray(backup.state.accounts) ||
+      !Array.isArray(backup.state.incomeSources)
+    ) {
+      throw new Error("Arquivo de backup inválido.");
+    }
+
+    if (!confirm("Restaurar este backup? Os dados atuais serão substituídos e a alteração será sincronizada com os outros aparelhos.")) return;
+
+    applyRemoteState(backup.state);
+    persist();
+    clearForm();
+    render();
+    alert("Backup restaurado com sucesso.");
+  } catch (error) {
+    alert(error.message || "Não foi possível restaurar o backup.");
+  } finally {
+    event.target.value = "";
+  }
 }
 
 function resetData() {

@@ -15,7 +15,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=4" />
+    <link rel="stylesheet" href="./styles.css?v=5" />
   </head>
   <body>
     <main class="app-shell">
@@ -100,6 +100,7 @@
               <button class="tab-button active" type="button" data-registration-tab="entry">Novo lançamento</button>
               <button class="tab-button" type="button" data-registration-tab="incomeSources">Cadastros Gerais</button>
               <button class="tab-button" type="button" data-registration-tab="name">Nome da planilha</button>
+              <button class="tab-button" type="button" data-registration-tab="backup">Backup</button>
             </div>
 
             <form id="entryForm" class="entry-form registration-tab-panel">
@@ -179,6 +180,18 @@
                 <button class="primary" type="submit">Adicionar</button>
               </form>
               <div id="incomeSourcesList" class="editable-list" style="margin-top: 14px;"></div>
+            </section>
+
+            <section id="backupPanel" class="registration-tab-panel backup-panel hidden">
+              <div>
+                <p class="eyebrow">Cópia completa</p>
+                <h3>Backup e recuperação</h3>
+              </div>
+              <div class="backup-actions">
+                <button id="downloadBackup" class="primary" type="button">Baixar backup</button>
+                <button id="restoreBackup" class="secondary" type="button">Restaurar backup</button>
+                <input id="backupFile" class="hidden" type="file" accept="application/json,.json" />
+              </div>
             </section>
           </section>
         </section>
@@ -317,6 +330,6 @@
       </div>
     </dialog>
 
-    <script src="./app.js?v=4"></script>
+    <script src="./app.js?v=5"></script>
   </body>
 </html>

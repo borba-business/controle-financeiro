@@ -974,6 +974,27 @@ tbody tr:last-child td {
   font-size: 0.82rem;
 }
 
+.backup-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  padding: 20px;
+}
+
+.backup-panel h3 {
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 10px;
+}
+
 @media (max-width: 520px) {
   .danger-dialog-content {
     grid-template-columns: 1fr;
@@ -1060,6 +1081,12 @@ tbody tr:last-child td {
 
   .panel {
     padding: 16px;
+  }
+
+  .backup-panel,
+  .backup-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 
