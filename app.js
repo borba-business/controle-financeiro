@@ -42,6 +42,7 @@ const state = loadState();
 let activeHistoryFilter = "all";
 let activeVisualTab = "overview";
 let activeRegistrationTab = "entry";
+let activeSubRegistrationTab = "incomeSources";
 let authSession = loadAuthSession();
 let syncTimer;
 let syncInProgress = false;
@@ -184,8 +185,8 @@ function bindEvents() {
   els.type.addEventListener("change", updateCategoryOptions);
   els.entryForm.addEventListener("submit", saveEntry);
   els.cancelEdit.addEventListener("click", clearForm);
-  els.incomeSourceForm.addEventListener("submit", addIncomeSource);
-  els.incomeSourcesList.addEventListener("click", removeIncomeSource);
+  els.incomeSourceForm.addEventListener("submit", addGeneralRegistrationItem);
+  els.incomeSourcesList.addEventListener("click", removeGeneralRegistrationItem);
   els.addAccount.addEventListener("click", addAccount);
   els.addCategory.addEventListener("click", addCategory);
   els.themeToggle.addEventListener("click", toggleTheme);
@@ -225,6 +226,13 @@ function bindEvents() {
     button.addEventListener("click", () => {
       activeRegistrationTab = button.dataset.registrationTab;
       renderRegistrationTabs();
+    });
+  });
+
+  document.querySelectorAll("[data-sub-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeSubRegistrationTab = button.dataset.subTab;
+      renderGeneralRegistrations();
     });
   });
 
@@ -881,31 +889,91 @@ function addCategory() {
   persist();
 }
 
-function addIncomeSource(event) {
+function generalRegistrationConfig() {
+  if (activeSubRegistrationTab === "categories") {
+    return {
+      label: "Nova categoria",
+      placeholder: "Ex.: Educação, Saúde, Mercado",
+      items: state.categories.Despesa || [],
+      duplicateMessage: "Esta categoria já está cadastrada.",
+      removeMessage: "categorias",
+    };
+  }
+
+  if (activeSubRegistrationTab === "accounts") {
+    return {
+      label: "Nova conta",
+      placeholder: "Ex.: Carteira, Banco, Poupança",
+      items: state.accounts,
+      duplicateMessage: "Esta conta já está cadastrada.",
+      removeMessage: "contas",
+    };
+  }
+
+  return {
+    label: "Nova origem de receita",
+    placeholder: "Ex.: Mercado, aluguel, cliente",
+    items: state.incomeSources,
+    duplicateMessage: "Esta origem já está cadastrada.",
+    removeMessage: "origens de receita",
+  };
+}
+
+function addGeneralRegistrationItem(event) {
   event.preventDefault();
   const cleanName = els.newIncomeSource.value.trim();
-  if (!cleanName || state.incomeSources.includes(cleanName)) return;
-  state.incomeSources = normalizeIncomeSources([...state.incomeSources, cleanName]);
-  fillSelect(els.incomeSource, state.incomeSources);
-  els.incomeSource.value = cleanName;
+  if (!cleanName) return;
+
+  const config = generalRegistrationConfig();
+  const alreadyExists = config.items.some((item) => item.toLocaleLowerCase("pt-BR") === cleanName.toLocaleLowerCase("pt-BR"));
+  if (alreadyExists) {
+    alert(config.duplicateMessage);
+    return;
+  }
+
+  if (activeSubRegistrationTab === "categories") {
+    state.categories.Despesa = [...config.items, cleanName];
+    if (els.type.value === "Despesa") updateCategoryOptions();
+  } else if (activeSubRegistrationTab === "accounts") {
+    state.accounts = [...state.accounts, cleanName];
+    fillSelect(els.account, state.accounts);
+    els.account.value = cleanName;
+  } else {
+    state.incomeSources = normalizeIncomeSources([...state.incomeSources, cleanName]);
+    fillSelect(els.incomeSource, state.incomeSources);
+    els.incomeSource.value = cleanName;
+  }
+
   els.newIncomeSource.value = "";
-  renderIncomeSourcesList();
+  renderGeneralRegistrations();
   persist();
 }
 
-function removeIncomeSource(event) {
-  const button = event.target.closest("button[data-income-source]");
+function removeGeneralRegistrationItem(event) {
+  const button = event.target.closest("button[data-general-item]");
   if (!button) return;
-  const selectedSource = button.dataset.incomeSource;
-  if (!selectedSource || selectedSource === "Não se aplica") {
+  const selectedItem = button.dataset.generalItem;
+  if (!selectedItem || (activeSubRegistrationTab === "incomeSources" && selectedItem === "Não se aplica")) {
     alert('A opção "Não se aplica" é fixa e não pode ser removida.');
     return;
   }
-  if (!confirm(`Remover "${selectedSource}" da lista de origens? Os históricos já cadastrados continuarão salvos.`)) return;
-  state.incomeSources = normalizeIncomeSources(state.incomeSources.filter((source) => source !== selectedSource));
-  fillSelect(els.incomeSource, state.incomeSources);
-  els.incomeSource.value = state.incomeSources[0] || "Não se aplica";
-  renderIncomeSourcesList();
+
+  const config = generalRegistrationConfig();
+  if (!confirm(`Remover "${selectedItem}" da lista de ${config.removeMessage}? Os históricos já cadastrados continuarão salvos.`)) return;
+
+  if (activeSubRegistrationTab === "categories") {
+    state.categories.Despesa = state.categories.Despesa.filter((item) => item !== selectedItem);
+    if (els.type.value === "Despesa") updateCategoryOptions();
+  } else if (activeSubRegistrationTab === "accounts") {
+    state.accounts = state.accounts.filter((item) => item !== selectedItem);
+    fillSelect(els.account, state.accounts);
+  } else {
+    state.incomeSources = normalizeIncomeSources(state.incomeSources.filter((item) => item !== selectedItem));
+    fillSelect(els.incomeSource, state.incomeSources);
+    els.incomeSource.value = state.incomeSources[0] || "Não se aplica";
+  }
+
+  renderGeneralRegistrations();
   persist();
 }
 
@@ -944,19 +1012,28 @@ function renderRegistrationTabs() {
   els.incomeSourcesPanel.classList.toggle("hidden", activeRegistrationTab !== "incomeSources");
   els.nameSheetPanel.classList.toggle("hidden", activeRegistrationTab !== "name");
   els.backupPanel.classList.toggle("hidden", activeRegistrationTab !== "backup");
-  renderIncomeSourcesList();
+  renderGeneralRegistrations();
 }
 
-function renderIncomeSourcesList() {
-  els.incomeSourcesList.innerHTML = state.incomeSources
-    .map((source) => {
-      const isFixed = source === "Não se aplica";
+function renderGeneralRegistrations() {
+  document.querySelectorAll("[data-sub-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.subTab === activeSubRegistrationTab);
+  });
+
+  const config = generalRegistrationConfig();
+  document.querySelector("#subFormLabel").textContent = config.label;
+  els.newIncomeSource.placeholder = config.placeholder;
+  els.newIncomeSource.value = "";
+
+  els.incomeSourcesList.innerHTML = config.items
+    .map((item) => {
+      const isFixed = activeSubRegistrationTab === "incomeSources" && item === "Não se aplica";
       const deleteButton = isFixed
         ? `<span class="fixed-label">Fixo</span>`
-        : `<button class="icon-danger" type="button" data-income-source="${escapeHtml(source)}" aria-label="Remover ${escapeHtml(source)}">🗑</button>`;
+        : `<button class="icon-danger" type="button" data-general-item="${escapeHtml(item)}" aria-label="Remover ${escapeHtml(item)}">🗑</button>`;
       return `
         <div class="editable-list-row">
-          <span>${escapeHtml(source)}</span>
+          <span>${escapeHtml(item)}</span>
           ${deleteButton}
         </div>
       `;
