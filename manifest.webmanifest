@@ -1,6 +1,6 @@
 {
-  "name": "Controle Financeiro",
-  "short_name": "Finanças",
+  "name": "Planilha de Controle Financeiro",
+  "short_name": "Planilha Financeira",
   "description": "Controle pessoal de receitas, despesas, contas e pagamentos.",
   "lang": "pt-BR",
   "start_url": "./",

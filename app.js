@@ -96,10 +96,8 @@ const els = {
   incomeSource: document.querySelector("#incomeSource"),
   description: document.querySelector("#description"),
   category: document.querySelector("#category"),
-  addCategory: document.querySelector("#addCategory"),
   payment: document.querySelector("#payment"),
   account: document.querySelector("#account"),
-  addAccount: document.querySelector("#addAccount"),
   amount: document.querySelector("#amount"),
   notes: document.querySelector("#notes"),
   incomeSourceChart: document.querySelector("#incomeSourceChart"),
@@ -187,8 +185,6 @@ function bindEvents() {
   els.cancelEdit.addEventListener("click", clearForm);
   els.incomeSourceForm.addEventListener("submit", addGeneralRegistrationItem);
   els.incomeSourcesList.addEventListener("click", removeGeneralRegistrationItem);
-  els.addAccount.addEventListener("click", addAccount);
-  els.addCategory.addEventListener("click", addCategory);
   els.themeToggle.addEventListener("click", toggleTheme);
   els.exportCsv.addEventListener("click", exportCsv);
   els.resetData.addEventListener("click", resetData);
@@ -530,7 +526,7 @@ function applyRemoteState(remote) {
   updateCategoryOptions();
   els.ownerName.value = state.ownerName;
   els.ownerNameHeading.textContent = state.ownerName;
-  document.title = `${state.ownerName} | Controle Financeiro`;
+  document.title = "Planilha de Controle Financeiro";
   document.body.classList.toggle("dark", state.theme === "dark");
   updateThemeButton();
   fillYearFilter(new Date().getFullYear());
@@ -551,7 +547,7 @@ function updateOwnerName() {
   const cleanName = els.ownerName.value.trim() || DEFAULT_OWNER_NAME;
   state.ownerName = cleanName;
   els.ownerNameHeading.textContent = cleanName;
-  document.title = `${cleanName} | Controle Financeiro`;
+  document.title = "Planilha de Controle Financeiro";
   persist();
 }
 
@@ -570,10 +566,19 @@ function normalizeIncomeSources(values) {
   return [...new Set([...cleanValues, "Não se aplica"])];
 }
 
+function currentCategoryOptions() {
+  if (!state.categories || typeof state.categories !== "object") {
+    state.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+  }
+  if (!Array.isArray(state.categories.Despesa)) {
+    state.categories.Despesa = [...DEFAULT_CATEGORIES.Despesa];
+  }
+  return state.categories.Despesa;
+}
+
 function updateCategoryOptions() {
   const typeValue = els.type.value;
-  const currentCategories = state.categories && state.categories[typeValue] ? state.categories[typeValue] : DEFAULT_CATEGORIES[typeValue];
-  fillSelect(els.category, currentCategories);
+  fillSelect(els.category, currentCategoryOptions());
   els.incomeSource.disabled = typeValue === "Despesa";
   if (typeValue === "Despesa") {
     ensureIncomeSourceOption("Não se aplica");
@@ -839,6 +844,7 @@ function editEntry(id) {
   ensureIncomeSourceOption(item.incomeSource);
   els.incomeSource.value = item.incomeSource;
   els.description.value = item.description;
+  ensureCategoryOption(item.category);
   els.category.value = item.category;
   els.payment.value = item.payment;
   els.account.value = item.account;
@@ -859,34 +865,12 @@ function deleteEntry(id) {
   render();
 }
 
-function addAccount() {
-  const name = prompt("Nome da nova conta:");
-  if (!name) return;
-  const cleanName = name.trim();
-  if (!cleanName || state.accounts.includes(cleanName)) return;
-  state.accounts.push(cleanName);
-  fillSelect(els.account, state.accounts);
-  els.account.value = cleanName;
-  persist();
-}
-
-function addCategory() {
-  const typeValue = els.type.value;
-  const name = prompt(`Nome da nova categoria de ${typeValue.toLowerCase()}:`);
-  if (!name) return;
-  const cleanName = name.trim();
-  if (!cleanName) return;
-  if (!state.categories) {
-    state.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-  }
-  if (!state.categories[typeValue]) {
-    state.categories[typeValue] = [...DEFAULT_CATEGORIES[typeValue]];
-  }
-  if (state.categories[typeValue].includes(cleanName)) return;
-  state.categories[typeValue].push(cleanName);
-  fillSelect(els.category, state.categories[typeValue]);
-  els.category.value = cleanName;
-  persist();
+function ensureCategoryOption(category) {
+  if (!category || currentCategoryOptions().includes(category)) return;
+  const option = document.createElement("option");
+  option.value = category;
+  option.textContent = `${category} (histórico)`;
+  els.category.append(option);
 }
 
 function generalRegistrationConfig() {
@@ -894,7 +878,7 @@ function generalRegistrationConfig() {
     return {
       label: "Nova categoria",
       placeholder: "Ex.: Educação, Saúde, Mercado",
-      items: state.categories.Despesa || [],
+      items: currentCategoryOptions(),
       duplicateMessage: "Esta categoria já está cadastrada.",
       removeMessage: "categorias",
     };
@@ -933,7 +917,7 @@ function addGeneralRegistrationItem(event) {
 
   if (activeSubRegistrationTab === "categories") {
     state.categories.Despesa = [...config.items, cleanName];
-    if (els.type.value === "Despesa") updateCategoryOptions();
+    updateCategoryOptions();
   } else if (activeSubRegistrationTab === "accounts") {
     state.accounts = [...state.accounts, cleanName];
     fillSelect(els.account, state.accounts);
@@ -963,7 +947,7 @@ function removeGeneralRegistrationItem(event) {
 
   if (activeSubRegistrationTab === "categories") {
     state.categories.Despesa = state.categories.Despesa.filter((item) => item !== selectedItem);
-    if (els.type.value === "Despesa") updateCategoryOptions();
+    updateCategoryOptions();
   } else if (activeSubRegistrationTab === "accounts") {
     state.accounts = state.accounts.filter((item) => item !== selectedItem);
     fillSelect(els.account, state.accounts);

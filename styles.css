@@ -478,7 +478,7 @@ select:focus {
 
 .account-picker,
 .category-picker {
-  grid-template-columns: 1fr 44px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .square {
@@ -1177,6 +1177,11 @@ tbody tr:last-child td {
 
   .option-picker {
     grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .account-picker,
+  .category-picker {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .summary-grid {

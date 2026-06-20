@@ -3,19 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Lurdes Camargo | Controle Financeiro</title>
+    <title>Planilha de Controle Financeiro</title>
     <meta name="description" content="Planilha de controle financeiro pessoal moderna para gestão de receitas, despesas, contas e formas de pagamento." />
     <meta name="theme-color" content="#256d63" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Finanças" />
+    <meta name="apple-mobile-web-app-title" content="Planilha Financeira" />
+    <meta property="og:title" content="Planilha de Controle Financeiro" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./app-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=9" />
+    <link rel="stylesheet" href="./styles.css?v=12" />
   </head>
   <body>
     <main class="app-shell">
@@ -132,7 +133,6 @@
                 <span>Categoria</span>
                 <div class="option-picker category-picker">
                   <select id="category" required></select>
-                  <button id="addCategory" class="secondary square" type="button" aria-label="Adicionar categoria">+</button>
                 </div>
               </div>
               <label class="field">
@@ -143,7 +143,6 @@
                 <span>Conta</span>
                 <div class="option-picker account-picker">
                   <select id="account" required></select>
-                  <button id="addAccount" class="secondary square" type="button" aria-label="Adicionar conta">+</button>
                 </div>
               </div>
               <label class="field">
@@ -329,6 +328,6 @@
       </div>
     </dialog>
 
-    <script src="./app.js?v=9"></script>
+    <script src="./app.js?v=12"></script>
   </body>
 </html>
