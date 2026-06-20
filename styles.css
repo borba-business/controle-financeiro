@@ -215,6 +215,36 @@ select:focus {
   transform: translateY(0);
 }
 
+.sync-button {
+  gap: 9px;
+}
+
+.sync-indicator {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--muted) 12%, transparent);
+}
+
+.sync-button.connected .sync-indicator {
+  background: var(--income);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--income) 16%, transparent);
+}
+
+.sync-button.syncing .sync-indicator {
+  background: var(--accent);
+  animation: sync-pulse 1s ease-in-out infinite;
+}
+
+.sync-button.sync-error .sync-indicator {
+  background: var(--expense);
+}
+
+@keyframes sync-pulse {
+  50% { opacity: 0.35; }
+}
+
 .secondary {
   border: 1px solid var(--line);
   background: var(--surface);
@@ -843,6 +873,107 @@ tbody tr:last-child td {
   opacity: 0.42;
 }
 
+.auth-dialog {
+  width: min(460px, calc(100% - 32px));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+}
+
+.auth-dialog::backdrop {
+  background: rgba(5, 10, 9, 0.76);
+  backdrop-filter: blur(4px);
+}
+
+.auth-dialog-content {
+  padding: 26px;
+}
+
+.auth-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.auth-dialog-header h2 {
+  margin: 4px 0 0;
+  font-size: 1.35rem;
+}
+
+.icon-close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 1.45rem;
+}
+
+.auth-form,
+.auth-form label {
+  display: grid;
+  gap: 9px;
+}
+
+.auth-form {
+  gap: 16px;
+}
+
+.auth-form label {
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.auth-message {
+  min-height: 20px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.auth-message.error {
+  color: var(--expense);
+}
+
+.auth-message.success {
+  color: var(--income);
+}
+
+.auth-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.auth-account {
+  display: grid;
+  gap: 22px;
+}
+
+.account-summary {
+  display: grid;
+  gap: 5px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.account-summary span,
+.account-summary small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 @media (max-width: 520px) {
   .danger-dialog-content {
     grid-template-columns: 1fr;
@@ -856,6 +987,14 @@ tbody tr:last-child td {
 
   .danger-dialog-actions {
     flex-direction: column-reverse;
+  }
+
+  .auth-actions {
+    flex-direction: column-reverse;
+  }
+
+  .auth-actions button {
+    width: 100%;
   }
 }
 

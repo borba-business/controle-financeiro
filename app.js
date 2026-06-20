@@ -23,6 +23,9 @@ const DEFAULT_INCOME_SOURCES = ["Lurdes", "Camargo", "Família", "Banco", "Outro
 const DEFAULT_ACCOUNTS = ["Carteira", "Conta corrente", "Poupança", "Cartão", "Investimentos"];
 const DEFAULT_OWNER_NAME = "Lurdes Camargo";
 const STORAGE_KEY = "lurdes-controle-financeiro-v1";
+const AUTH_STORAGE_KEY = "controle-financeiro-auth-v1";
+const SUPABASE_URL = "https://uxioksvzpcogcuplfrdj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_0Rglw4_AS_h3B7IZaqN2GA_0Gic3UnW";
 
 const sampleEntries = [
   entry("2026-06-01", 5, "Receita", "Aposentadoria", "Aposentadoria", "Aposentadoria", "Transferência", "Conta corrente", 4200, "Recebimento mensal"),
@@ -39,6 +42,10 @@ const state = loadState();
 let activeHistoryFilter = "all";
 let activeVisualTab = "overview";
 let activeRegistrationTab = "entry";
+let authSession = loadAuthSession();
+let syncTimer;
+let syncInProgress = false;
+let authReady = false;
 
 const els = {
   monthFilter: document.querySelector("#monthFilter"),
@@ -50,11 +57,25 @@ const els = {
   exportCsv: document.querySelector("#exportCsv"),
   resetData: document.querySelector("#resetData"),
   clearData: document.querySelector("#clearData"),
+  authButton: document.querySelector("#authButton"),
+  authButtonLabel: document.querySelector("#authButtonLabel"),
   clearDataDialog: document.querySelector("#clearDataDialog"),
   clearDataForm: document.querySelector("#clearDataForm"),
   clearDataConfirmation: document.querySelector("#clearDataConfirmation"),
   cancelClearData: document.querySelector("#cancelClearData"),
   confirmClearData: document.querySelector("#confirmClearData"),
+  authDialog: document.querySelector("#authDialog"),
+  closeAuthDialog: document.querySelector("#closeAuthDialog"),
+  authForm: document.querySelector("#authForm"),
+  authEmail: document.querySelector("#authEmail"),
+  authPassword: document.querySelector("#authPassword"),
+  authMessage: document.querySelector("#authMessage"),
+  createAccount: document.querySelector("#createAccount"),
+  authAccount: document.querySelector("#authAccount"),
+  authAccountEmail: document.querySelector("#authAccountEmail"),
+  cloudSyncStatus: document.querySelector("#cloudSyncStatus"),
+  signOut: document.querySelector("#signOut"),
+  syncNow: document.querySelector("#syncNow"),
   startingBalanceTotal: document.querySelector("#startingBalanceTotal"),
   incomeTotal: document.querySelector("#incomeTotal"),
   expenseTotal: document.querySelector("#expenseTotal"),
@@ -148,6 +169,7 @@ function init() {
   bindEvents();
   renderRegistrationTabs();
   render();
+  initializeAuth();
 }
 
 function bindEvents() {
@@ -169,6 +191,12 @@ function bindEvents() {
   els.cancelClearData.addEventListener("click", closeClearDataDialog);
   els.clearDataConfirmation.addEventListener("input", updateClearDataConfirmation);
   els.clearDataForm.addEventListener("submit", confirmClearData);
+  els.authButton.addEventListener("click", openAuthDialog);
+  els.closeAuthDialog.addEventListener("click", () => els.authDialog.close());
+  els.authForm.addEventListener("submit", signIn);
+  els.createAccount.addEventListener("click", createAccount);
+  els.signOut.addEventListener("click", signOut);
+  els.syncNow.addEventListener("click", syncNow);
 
   document.querySelectorAll("[data-history-filter]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -238,6 +266,270 @@ function loadState() {
 
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleCloudSync();
+}
+
+function loadAuthSession() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function saveAuthSession(session) {
+  authSession = session;
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+}
+
+function clearAuthSession() {
+  authSession = null;
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+async function supabaseRequest(path, options = {}) {
+  const token = options.token === false ? null : (options.token || authSession?.access_token);
+  const response = await fetch(`${SUPABASE_URL}${path}`, {
+    method: options.method || "GET",
+    headers: {
+      apikey: SUPABASE_KEY,
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  const payload = response.status === 204 ? null : await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = payload?.msg || payload?.message || payload?.error_description || payload?.error || "Não foi possível concluir a operação.";
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+async function consumeAuthRedirect() {
+  if (!location.hash.includes("access_token=")) return;
+  const params = new URLSearchParams(location.hash.slice(1));
+  const accessToken = params.get("access_token");
+  if (!accessToken) return;
+
+  saveAuthSession({
+    access_token: accessToken,
+    refresh_token: params.get("refresh_token"),
+    expires_at: Math.floor(Date.now() / 1000) + Number(params.get("expires_in") || 3600),
+    user: null,
+  });
+  const user = await supabaseRequest("/auth/v1/user");
+  authSession.user = user;
+  saveAuthSession(authSession);
+  history.replaceState(null, "", `${location.pathname}${location.search}`);
+}
+
+async function ensureSession() {
+  if (!authSession) return null;
+  if (authSession.expires_at > Math.floor(Date.now() / 1000) + 60 && authSession.user) return authSession;
+  if (!authSession.refresh_token) {
+    clearAuthSession();
+    return null;
+  }
+
+  try {
+    const refreshed = await supabaseRequest("/auth/v1/token?grant_type=refresh_token", {
+      method: "POST",
+      token: false,
+      body: { refresh_token: authSession.refresh_token },
+    });
+    saveAuthSession(refreshed);
+    return authSession;
+  } catch {
+    clearAuthSession();
+    return null;
+  }
+}
+
+async function initializeAuth() {
+  try {
+    await consumeAuthRedirect();
+    const session = await ensureSession();
+    updateAuthUi();
+    if (session) await loadRemoteState();
+  } catch (error) {
+    setSyncStatus("error", friendlyAuthError(error));
+    updateAuthUi();
+  } finally {
+    authReady = true;
+  }
+}
+
+function openAuthDialog() {
+  setAuthMessage("");
+  updateAuthUi();
+  els.authDialog.showModal();
+  if (!authSession) requestAnimationFrame(() => els.authEmail.focus());
+}
+
+function updateAuthUi() {
+  const connected = Boolean(authSession?.user);
+  els.authForm.classList.toggle("hidden", connected);
+  els.authAccount.classList.toggle("hidden", !connected);
+  els.authButton.classList.toggle("connected", connected);
+  els.authButtonLabel.textContent = connected ? "Sincronizado" : "Entrar e sincronizar";
+  els.authAccountEmail.textContent = authSession?.user?.email || "";
+}
+
+function setAuthMessage(message, type = "") {
+  els.authMessage.textContent = message;
+  els.authMessage.className = `auth-message${type ? ` ${type}` : ""}`;
+}
+
+function setSyncStatus(status, message) {
+  els.authButton.classList.remove("syncing", "sync-error");
+  if (status === "syncing") els.authButton.classList.add("syncing");
+  if (status === "error") els.authButton.classList.add("sync-error");
+  if (authSession?.user && status !== "error") els.authButton.classList.add("connected");
+  els.authButtonLabel.textContent = status === "syncing" ? "Sincronizando" : authSession?.user ? "Sincronizado" : "Entrar e sincronizar";
+  els.cloudSyncStatus.textContent = message || (status === "error" ? "Falha na sincronização" : "Dados sincronizados");
+}
+
+async function createAccount() {
+  if (!els.authForm.reportValidity()) return;
+  setAuthMessage("Criando sua conta...");
+  els.createAccount.disabled = true;
+
+  try {
+    const redirectTo = "https://borba-business.github.io/controle-financeiro/";
+    const result = await supabaseRequest(`/auth/v1/signup?redirect_to=${encodeURIComponent(redirectTo)}`, {
+      method: "POST",
+      token: false,
+      body: { email: els.authEmail.value.trim(), password: els.authPassword.value },
+    });
+
+    if (result.access_token) {
+      saveAuthSession(result);
+      updateAuthUi();
+      await loadRemoteState();
+      setAuthMessage("");
+    } else {
+      setAuthMessage("Conta criada. Abra o e-mail de confirmação e depois entre no aplicativo.", "success");
+    }
+  } catch (error) {
+    setAuthMessage(friendlyAuthError(error), "error");
+  } finally {
+    els.createAccount.disabled = false;
+  }
+}
+
+async function signIn(event) {
+  event.preventDefault();
+  setAuthMessage("Entrando...");
+
+  try {
+    const session = await supabaseRequest("/auth/v1/token?grant_type=password", {
+      method: "POST",
+      token: false,
+      body: { email: els.authEmail.value.trim(), password: els.authPassword.value },
+    });
+    saveAuthSession(session);
+    updateAuthUi();
+    await loadRemoteState();
+    setAuthMessage("");
+  } catch (error) {
+    setAuthMessage(friendlyAuthError(error), "error");
+  }
+}
+
+async function signOut() {
+  try {
+    await supabaseRequest("/auth/v1/logout", { method: "POST" });
+  } catch {
+    // The local session is cleared even if the network is unavailable.
+  }
+  clearAuthSession();
+  updateAuthUi();
+  els.authDialog.close();
+}
+
+function scheduleCloudSync() {
+  if (!authReady || !authSession?.user || syncInProgress) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => syncToCloud(), 700);
+}
+
+async function syncNow() {
+  await syncToCloud();
+}
+
+async function syncToCloud() {
+  if (syncInProgress || !authSession?.user) return;
+  syncInProgress = true;
+  setSyncStatus("syncing", "Enviando alterações...");
+
+  try {
+    const session = await ensureSession();
+    if (!session) throw new Error("Sessão expirada. Entre novamente.");
+    await supabaseRequest("/rest/v1/finance_states?on_conflict=user_id", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: {
+        user_id: session.user.id,
+        state,
+        updated_at: new Date().toISOString(),
+      },
+    });
+    setSyncStatus("success", `Sincronizado às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
+  } catch (error) {
+    setSyncStatus("error", friendlyAuthError(error));
+  } finally {
+    syncInProgress = false;
+  }
+}
+
+async function loadRemoteState() {
+  const session = await ensureSession();
+  if (!session) return;
+  setSyncStatus("syncing", "Buscando seus dados...");
+
+  const rows = await supabaseRequest(`/rest/v1/finance_states?select=state,updated_at&user_id=eq.${session.user.id}`);
+  if (rows?.[0]?.state) {
+    applyRemoteState(rows[0].state);
+    setSyncStatus("success", "Dados atualizados neste aparelho");
+  } else {
+    await syncToCloud();
+  }
+}
+
+function applyRemoteState(remote) {
+  state.entries = Array.isArray(remote.entries) ? remote.entries : [];
+  state.accounts = Array.isArray(remote.accounts) ? remote.accounts : [...DEFAULT_ACCOUNTS];
+  state.incomeSources = Array.isArray(remote.incomeSources) ? normalizeIncomeSources(remote.incomeSources) : [...DEFAULT_INCOME_SOURCES];
+  state.categories = remote.categories && typeof remote.categories === "object" ? remote.categories : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+  state.ownerName = typeof remote.ownerName === "string" && remote.ownerName.trim() ? remote.ownerName : DEFAULT_OWNER_NAME;
+  state.theme = remote.theme === "dark" ? "dark" : "light";
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  fillSelect(els.incomeSource, state.incomeSources);
+  fillSelect(els.account, state.accounts);
+  updateCategoryOptions();
+  els.ownerName.value = state.ownerName;
+  els.ownerNameHeading.textContent = state.ownerName;
+  document.title = `${state.ownerName} | Controle Financeiro`;
+  document.body.classList.toggle("dark", state.theme === "dark");
+  updateThemeButton();
+  fillYearFilter(new Date().getFullYear());
+  render();
+}
+
+function friendlyAuthError(error) {
+  const message = String(error?.message || "");
+  if (/invalid login credentials/i.test(message)) return "E-mail ou senha incorretos.";
+  if (/email not confirmed/i.test(message)) return "Confirme seu e-mail antes de entrar.";
+  if (/user already registered/i.test(message)) return "Este e-mail já possui uma conta.";
+  if (/password/i.test(message) && /characters/i.test(message)) return "A senha precisa ter pelo menos 6 caracteres.";
+  if (/failed to fetch|network/i.test(message)) return "Sem conexão. Os dados continuam salvos neste aparelho.";
+  return message || "Não foi possível concluir a operação.";
 }
 
 function updateOwnerName() {

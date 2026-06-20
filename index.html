@@ -15,7 +15,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=3" />
+    <link rel="stylesheet" href="./styles.css?v=4" />
   </head>
   <body>
     <main class="app-shell">
@@ -33,6 +33,10 @@
             <span>Ano</span>
             <select id="yearFilter"></select>
           </label>
+          <button id="authButton" class="secondary sync-button" type="button">
+            <span id="syncIndicator" class="sync-indicator" aria-hidden="true"></span>
+            <span id="authButtonLabel">Entrar e sincronizar</span>
+          </button>
           <button id="themeToggle" class="secondary theme-toggle" type="button" aria-pressed="false">Tema escuro</button>
           <button id="exportCsv" class="secondary" type="button">Exportar CSV</button>
           <button id="resetData" class="ghost" type="button">Restaurar</button>
@@ -273,6 +277,46 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=3"></script>
+    <dialog id="authDialog" class="auth-dialog" aria-labelledby="authDialogTitle">
+      <div class="auth-dialog-content">
+        <div class="auth-dialog-header">
+          <div>
+            <p class="eyebrow">Sincronização segura</p>
+            <h2 id="authDialogTitle">Acessar seus dados</h2>
+          </div>
+          <button id="closeAuthDialog" class="icon-close" type="button" aria-label="Fechar" title="Fechar">×</button>
+        </div>
+
+        <form id="authForm" class="auth-form">
+          <label>
+            E-mail
+            <input id="authEmail" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            Senha
+            <input id="authPassword" type="password" autocomplete="current-password" minlength="6" required />
+          </label>
+          <p id="authMessage" class="auth-message" role="status"></p>
+          <div class="auth-actions">
+            <button id="createAccount" class="secondary" type="button">Criar conta</button>
+            <button id="signIn" class="primary" type="submit">Entrar</button>
+          </div>
+        </form>
+
+        <section id="authAccount" class="auth-account hidden">
+          <div class="account-summary">
+            <span>Conta conectada</span>
+            <strong id="authAccountEmail"></strong>
+            <small id="cloudSyncStatus">Sincronização pronta</small>
+          </div>
+          <div class="auth-actions">
+            <button id="signOut" class="secondary" type="button">Sair</button>
+            <button id="syncNow" class="primary" type="button">Sincronizar agora</button>
+          </div>
+        </section>
+      </div>
+    </dialog>
+
+    <script src="./app.js?v=4"></script>
   </body>
 </html>
