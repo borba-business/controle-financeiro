@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Lurdes Camargo | Controle Financeiro</title>
+    <meta name="description" content="Planilha de controle financeiro pessoal moderna para gestão de receitas, despesas, contas e formas de pagamento." />
+    <meta name="theme-color" content="#256d63" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Finanças" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./app-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css?v=3" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar">
+        <div>
+          <p id="controlYearLabel" class="eyebrow">Controle financeiro 2026</p>
+          <h1 id="ownerNameHeading">Lurdes Camargo</h1>
+        </div>
+        <div class="top-actions">
+          <label class="field compact">
+            <span>Mês</span>
+            <select id="monthFilter"></select>
+          </label>
+          <label class="field compact">
+            <span>Ano</span>
+            <select id="yearFilter"></select>
+          </label>
+          <button id="themeToggle" class="secondary theme-toggle" type="button" aria-pressed="false">Tema escuro</button>
+          <button id="exportCsv" class="secondary" type="button">Exportar CSV</button>
+          <button id="resetData" class="ghost" type="button">Restaurar</button>
+          <button id="clearData" class="ghost-danger" type="button">Limpar Planilha</button>
+        </div>
+      </section>
+
+      <section class="summary-grid" aria-label="Resumo do mês">
+        <article class="metric starting-balance">
+          <span>Saldo inicial</span>
+          <strong id="startingBalanceTotal">R$ 0,00</strong>
+        </article>
+        <article class="metric income">
+          <span>Receitas</span>
+          <strong id="incomeTotal">R$ 0,00</strong>
+        </article>
+        <article class="metric expense">
+          <span>Despesas</span>
+          <strong id="expenseTotal">R$ 0,00</strong>
+        </article>
+        <article class="metric result">
+          <span>Resultado</span>
+          <strong id="balanceTotal">R$ 0,00</strong>
+        </article>
+        <article class="metric final-balance">
+          <span>Saldo final</span>
+          <strong id="endingBalanceTotal">R$ 0,00</strong>
+        </article>
+        <article class="metric">
+          <span>Lançamentos</span>
+          <strong id="entryCount">0</strong>
+        </article>
+      </section>
+
+      <section class="panel dashboard-panel">
+        <div class="panel-title">
+          <h2>Dashboard</h2>
+          <p>Ganhos e gastos</p>
+        </div>
+        <div class="dashboard-charts">
+          <div class="chart-block">
+            <h3>Comparativo do período</h3>
+            <div id="cashflowChart" class="money-bars"></div>
+          </div>
+          <div class="chart-block">
+            <h3>Visão mês a mês</h3>
+            <div id="monthlyChart" class="month-chart"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <section id="entryArea" class="entry-area">
+          <section class="panel registrations-panel">
+            <div class="panel-title">
+              <h2>Cadastros</h2>
+              <button id="cancelEdit" class="ghost hidden" type="button">Cancelar edição</button>
+            </div>
+
+            <div id="registrationTabs" class="view-tabs compact-tabs">
+              <button class="tab-button active" type="button" data-registration-tab="entry">Novo lançamento</button>
+              <button class="tab-button" type="button" data-registration-tab="incomeSources">Cadastros Gerais</button>
+              <button class="tab-button" type="button" data-registration-tab="name">Nome da planilha</button>
+            </div>
+
+            <form id="entryForm" class="entry-form registration-tab-panel">
+              <input id="editingId" type="hidden" />
+              <label class="field">
+                <span>Data</span>
+                <input id="date" type="date" required />
+              </label>
+              <label class="field">
+                <span>Referente ao mês</span>
+                <select id="referenceMonth" required></select>
+              </label>
+              <label class="field">
+                <span>Tipo</span>
+                <select id="type" required>
+                  <option value="Receita">Receita</option>
+                  <option value="Despesa">Despesa</option>
+                </select>
+              </label>
+              <div class="field">
+                <span>Origem da receita</span>
+                <select id="incomeSource" required></select>
+              </div>
+              <label class="field wide">
+                <span>Descrição</span>
+                <input id="description" type="text" placeholder="Ex.: IPVA, UNIMED, mercado" required />
+              </label>
+              <div class="field">
+                <span>Categoria</span>
+                <div class="option-picker category-picker">
+                  <select id="category" required></select>
+                  <button id="addCategory" class="secondary square" type="button" aria-label="Adicionar categoria">+</button>
+                </div>
+              </div>
+              <label class="field">
+                <span>Forma de pagamento</span>
+                <select id="payment" required></select>
+              </label>
+              <div class="field">
+                <span>Conta</span>
+                <div class="option-picker account-picker">
+                  <select id="account" required></select>
+                  <button id="addAccount" class="secondary square" type="button" aria-label="Adicionar conta">+</button>
+                </div>
+              </div>
+              <label class="field">
+                <span>Valor</span>
+                <input id="amount" type="number" min="0.01" step="0.01" placeholder="0,00" required />
+              </label>
+              <label class="field wide">
+                <span>Observações</span>
+                <input id="notes" type="text" placeholder="Opcional" />
+              </label>
+              <button class="primary wide" type="submit">Salvar lançamento</button>
+            </form>
+
+            <section id="nameSheetPanel" class="registration-tab-panel name-sheet-panel hidden">
+              <label class="field owner-field">
+                <span>Nome da planilha</span>
+                <input id="ownerName" type="text" value="Lurdes Camargo" placeholder="Digite um nome" />
+              </label>
+            </section>
+
+            <section id="incomeSourcesPanel" class="registration-tab-panel income-sources-panel hidden">
+              <div id="subRegistrationTabs" class="view-tabs compact-tabs" style="margin-bottom: 18px; width: 100%;">
+                <button class="tab-button active" type="button" data-sub-tab="incomeSources">Origens Receita</button>
+                <button class="tab-button" type="button" data-sub-tab="categoriesReceita">Cat. Receitas</button>
+                <button class="tab-button" type="button" data-sub-tab="categoriesDespesa">Cat. Despesas</button>
+                <button class="tab-button" type="button" data-sub-tab="accounts">Contas</button>
+              </div>
+
+              <form id="incomeSourceForm" class="inline-create-form">
+                <label class="field">
+                  <span id="subFormLabel">Nova origem de receita</span>
+                  <input id="newIncomeSource" type="text" placeholder="Ex.: Mercado, aluguel, cliente" required />
+                </label>
+                <button class="primary" type="submit">Adicionar</button>
+              </form>
+              <div id="incomeSourcesList" class="editable-list" style="margin-top: 14px;"></div>
+            </section>
+          </section>
+        </section>
+
+        <section id="visualArea" class="visual-area">
+          <section class="panel charts-panel">
+            <div class="panel-title">
+              <h2>Análise Financeira</h2>
+              <p id="selectedMonthLabel">Junho</p>
+            </div>
+            <div id="visualTabs" class="view-tabs compact-tabs">
+              <button class="tab-button active" type="button" data-visual-tab="overview">Visão geral</button>
+              <button class="tab-button" type="button" data-visual-tab="payment">Pagamento</button>
+              <button class="tab-button" type="button" data-visual-tab="income">Resumo de receitas</button>
+            </div>
+            <div id="visualOverviewPanel" class="visual-tab-panel">
+              <div class="chart-block">
+                <h3>Despesas por categoria</h3>
+                <div id="categoryChart" class="bar-list"></div>
+              </div>
+              <div class="chart-block">
+                <h3>Despesas por conta</h3>
+                <div id="accountChart" class="bar-list"></div>
+              </div>
+            </div>
+            <div id="visualPaymentPanel" class="visual-tab-panel hidden">
+              <div class="chart-block">
+                <h3>Forma de pagamento</h3>
+                <div id="paymentChart" class="bar-list"></div>
+              </div>
+            </div>
+            <div id="incomeSummaryPanel" class="visual-tab-panel income-summary-panel hidden">
+              <div class="chart-block">
+                <h3>Receitas por origem</h3>
+                <div id="incomeSourceChart" class="bar-list"></div>
+              </div>
+              <div class="chart-block">
+                <h3>Saldo final por conta</h3>
+                <div id="finalAccountBalanceChart" class="bar-list"></div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section>
+
+      <section class="panel history-panel">
+        <div class="panel-title">
+          <h2>Histórico</h2>
+          <label class="search-box">
+            <span>Buscar</span>
+            <input id="searchInput" type="search" placeholder="Descrição, categoria, conta..." />
+          </label>
+        </div>
+        <div class="history-tabs">
+          <button class="tab-button active" type="button" data-history-filter="all">Todos</button>
+          <button class="tab-button" type="button" data-history-filter="Receita">Receitas</button>
+          <button class="tab-button" type="button" data-history-filter="Despesa">Despesas</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Referente</th>
+                <th>Tipo</th>
+                <th>Descrição</th>
+                <th>Categoria</th>
+                <th>Forma</th>
+                <th>Conta</th>
+                <th>Valor</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="entriesTable"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="clearDataDialog" class="danger-dialog" aria-labelledby="clearDataTitle">
+      <form id="clearDataForm" class="danger-dialog-content">
+        <div class="danger-dialog-icon" aria-hidden="true">!</div>
+        <div>
+          <p class="danger-dialog-eyebrow">Ação irreversível</p>
+          <h2 id="clearDataTitle">Limpar toda a planilha?</h2>
+          <p>Todos os lançamentos de receitas e despesas serão apagados permanentemente. Os cadastros e o nome da planilha serão mantidos.</p>
+        </div>
+        <label for="clearDataConfirmation">
+          Digite <strong>LIMPAR</strong> para confirmar
+          <input id="clearDataConfirmation" type="text" autocomplete="off" spellcheck="false" placeholder="LIMPAR" />
+        </label>
+        <div class="danger-dialog-actions">
+          <button id="cancelClearData" class="secondary" type="button">Cancelar</button>
+          <button id="confirmClearData" class="danger-confirm" type="submit" disabled>Apagar lançamentos</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="./app.js?v=3"></script>
+  </body>
+</html>
