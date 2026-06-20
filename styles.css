@@ -426,6 +426,33 @@ select:focus {
   display: grid;
   align-content: start;
   gap: 16px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  container-type: inline-size;
+}
+
+.registrations-panel,
+.charts-panel,
+.registration-tab-panel,
+.visual-tab-panel,
+.income-summary-panel {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.registrations-panel,
+.charts-panel {
+  overflow: hidden;
+}
+
+.registrations-panel .view-tabs,
+.charts-panel .view-tabs {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .entry-form {
@@ -1050,7 +1077,14 @@ tbody tr:last-child td {
 
   .dashboard-charts,
   .workspace {
-    grid-template-columns: 1fr;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace {
+    overflow: hidden;
   }
 }
 
@@ -1090,7 +1124,22 @@ tbody tr:last-child td {
 
   .entry-form,
   .inline-create-form {
-    grid-template-columns: 1fr;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .entry-form > *,
+  .entry-form label,
+  .option-picker {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .option-picker {
+    grid-template-columns: minmax(0, 1fr) 44px;
   }
 
   .summary-grid {
@@ -1122,6 +1171,8 @@ tbody tr:last-child td {
   }
 
   .panel {
+    min-width: 0;
+    max-width: 100%;
     width: 100%;
     padding: 16px;
   }
