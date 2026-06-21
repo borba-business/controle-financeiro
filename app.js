@@ -88,7 +88,7 @@ let syncTimer;
 let syncInProgress = false;
 let authReady = false;
 let conversionRequestId = 0;
-let exchangeChartMeta = { rowsCount: 0, source: "EUR", target: "BRL" };
+let exchangeChartMeta = { rowsCount: 0, source: "EUR", target: "BRL", rows: [] };
 let expandedChartBaseWidth = 1100;
 let expandedChartWidth = 1100;
 let expandedChartZoom = 1;
@@ -149,6 +149,7 @@ const els = {
   currency: document.querySelector("#currency"),
   amount: document.querySelector("#amount"),
   conversionPreview: document.querySelector("#conversionPreview"),
+  exchangeChartTitle: document.querySelector("#exchangeChartTitle"),
   exchangePair: document.querySelector("#exchangePair"),
   exchangePeriod: document.querySelector("#exchangePeriod"),
   exchangeCustomRange: document.querySelector("#exchangeCustomRange"),
@@ -160,6 +161,7 @@ const els = {
   exchangeMax: document.querySelector("#exchangeMax"),
   exchangeChart: document.querySelector("#exchangeChart"),
   exchangeChartDialog: document.querySelector("#exchangeChartDialog"),
+  expandedExchangeChartTitle: document.querySelector("#expandedExchangeChartTitle"),
   closeExchangeChartDialog: document.querySelector("#closeExchangeChartDialog"),
   expandedExchangeChartScroll: document.querySelector("#expandedExchangeChartScroll"),
   expandedExchangeChart: document.querySelector("#expandedExchangeChart"),
@@ -921,6 +923,28 @@ function formatExchangeRate(value, target) {
   return `${Number(value).toLocaleString(state.language === "en" ? "en-IE" : "pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${target}`;
 }
 
+function exchangePeriodLabel() {
+  const labels = {
+    "1m": ui("1 mês", "1 month"),
+    "3m": ui("3 meses", "3 months"),
+    "6m": ui("6 meses", "6 months"),
+    "1y": ui("1 ano", "1 year"),
+  };
+
+  if (state.exchangePeriod !== "custom") return labels[state.exchangePeriod] || labels["1m"];
+  const locale = state.language === "en" ? "en-IE" : "pt-BR";
+  const formatDate = (date) => new Date(`${date}T00:00:00`).toLocaleDateString(locale);
+  return state.exchangeCustomStart && state.exchangeCustomEnd
+    ? `${formatDate(state.exchangeCustomStart)} - ${formatDate(state.exchangeCustomEnd)}`
+    : ui("Personalizado", "Custom");
+}
+
+function updateExchangeChartTitles(source, target) {
+  const title = `${ui("Gráfico Cotações Tempo Real", "Real-Time Exchange Rate Chart")} · ${source}/${target} · ${exchangePeriodLabel()}`;
+  els.exchangeChartTitle.textContent = title;
+  els.expandedExchangeChartTitle.textContent = title;
+}
+
 function expandExchangeHistory(history) {
   const sourceRows = Object.entries(history)
     .sort(([dateA], [dateB]) => dateA.localeCompare(dateB));
@@ -961,6 +985,7 @@ function expandExchangeHistory(history) {
 function renderExchangeChart() {
   const history = state.exchangeHistory?.rates || {};
   const [source, target] = (state.exchangePair || "EUR/BRL").split("/");
+  updateExchangeChartTitles(source, target);
   const visibleStartDate = state.exchangeHistory?.startDate;
   const rows = expandExchangeHistory(history)
     .map((item) => ({ ...item, value: exchangePairValue(item.snapshot, source, target) }))
@@ -968,7 +993,7 @@ function renderExchangeChart() {
     .filter((item) => Number.isFinite(item.value));
 
   if (!rows.length) {
-    exchangeChartMeta = { rowsCount: 0, source, target };
+    exchangeChartMeta = { rowsCount: 0, source, target, rows: [] };
     els.exchangeCurrent.textContent = "—";
     els.exchangeMin.textContent = "—";
     els.exchangeMax.textContent = "—";
@@ -977,7 +1002,7 @@ function renderExchangeChart() {
   }
 
   const values = rows.map((item) => item.value);
-  exchangeChartMeta = { rowsCount: rows.length, source, target };
+  exchangeChartMeta = { rowsCount: rows.length, source, target, rows };
   const minimum = Math.min(...values);
   const maximum = Math.max(...values);
   const latest = rows.at(-1).value;
@@ -1012,7 +1037,7 @@ function renderExchangeChart() {
       month: "short",
       ...(includeYear ? { year: "2-digit" } : {}),
     });
-    return `<text class="exchange-axis-label" x="${x(index)}" y="${height - 12}" text-anchor="middle">${label}</text>`;
+    return `<text class="exchange-axis-label exchange-date-label" x="${x(index)}" y="${height - 12}" text-anchor="middle">${label}</text>`;
   }).join("");
   const pointMarkers = rows.map((item, index) => {
     const marketStatus = item.carried ? ui("mercado fechado", "market closed") : ui("cotacao oficial", "official rate");
@@ -1025,7 +1050,8 @@ function renderExchangeChart() {
     ${grid}
     ${dateLabels}
     <polygon class="exchange-area" points="${areaPoints}"></polygon>
-    <line class="exchange-hover-line" x1="0" y1="${padding.top}" x2="0" y2="${padding.top + plotHeight}"></line>
+    <line class="exchange-hover-line exchange-hover-line-vertical" x1="0" y1="${padding.top}" x2="0" y2="${padding.top + plotHeight}"></line>
+    <line class="exchange-hover-line exchange-hover-line-horizontal" x1="${padding.left}" y1="0" x2="${width - padding.right}" y2="0"></line>
     <polyline class="exchange-line" pathLength="1" points="${points}"></polyline>
     ${pointMarkers}
   </svg>
@@ -1040,12 +1066,14 @@ function renderExchangeChart() {
 
 function bindExchangeChartInteractions(source, target, chart = els.exchangeChart) {
   const tooltip = chart.querySelector(".exchange-tooltip");
-  const guide = chart.querySelector(".exchange-hover-line");
+  const verticalGuide = chart.querySelector(".exchange-hover-line-vertical");
+  const horizontalGuide = chart.querySelector(".exchange-hover-line-horizontal");
+  const guides = [verticalGuide, horizontalGuide].filter(Boolean);
   const points = [...chart.querySelectorAll(".exchange-point")];
 
   const hideTooltip = () => {
     tooltip.classList.remove("visible");
-    guide.classList.remove("visible");
+    guides.forEach((guide) => guide.classList.remove("visible"));
     points.forEach((point) => point.classList.remove("active"));
   };
 
@@ -1072,9 +1100,12 @@ function bindExchangeChartInteractions(source, target, chart = els.exchangeChart
     tooltip.classList.add("visible");
 
     const guideX = point.getAttribute("cx");
-    guide.setAttribute("x1", guideX);
-    guide.setAttribute("x2", guideX);
-    guide.classList.add("visible");
+    const guideY = point.getAttribute("cy");
+    verticalGuide?.setAttribute("x1", guideX);
+    verticalGuide?.setAttribute("x2", guideX);
+    horizontalGuide?.setAttribute("y1", guideY);
+    horizontalGuide?.setAttribute("y2", guideY);
+    guides.forEach((guide) => guide.classList.add("visible"));
   };
 
   points.forEach((point) => {
@@ -1099,6 +1130,7 @@ function openExpandedExchangeChart() {
   els.expandedExchangeChart.style.width = `${expandedChartWidth}px`;
   els.expandedExchangeChart.innerHTML = `${sourceSvg.outerHTML}<div class="exchange-tooltip" role="status"></div>`;
   resizeExpandedSvg(expandedChartWidth, 520, true);
+  updateExpandedDateLabels();
   bindExchangeChartInteractions(exchangeChartMeta.source, exchangeChartMeta.target, els.expandedExchangeChart);
   els.exchangeChartDialog.showModal();
 
@@ -1150,7 +1182,40 @@ function setExpandedChartZoom(nextZoom, focalX = null) {
   expandedChartZoom = zoom;
   els.expandedExchangeChart.style.width = `${newWidth}px`;
   els.exchangeZoomLevel.textContent = `${Math.round(zoom * 100)}%`;
+  updateExpandedDateLabels();
   scroll.scrollLeft = contentRatio * newWidth - localFocalX;
+}
+
+function updateExpandedDateLabels() {
+  const svg = els.expandedExchangeChart.querySelector("svg");
+  const rows = exchangeChartMeta.rows || [];
+  const points = [...els.expandedExchangeChart.querySelectorAll(".exchange-point")];
+  if (!svg || !rows.length || !points.length) return;
+
+  const existingLabels = [...svg.querySelectorAll(".exchange-date-label")];
+  const labelY = Number(existingLabels[0]?.getAttribute("y")) || 496;
+  existingLabels.forEach((label) => label.remove());
+
+  const desiredCount = Math.min(rows.length, Math.max(3, Math.round(3 + (expandedChartZoom - 1) * 7)));
+  const indexes = [...new Set(Array.from({ length: desiredCount }, (_, index) => (
+    Math.round((index / Math.max(desiredCount - 1, 1)) * (rows.length - 1))
+  )))];
+  const locale = state.language === "en" ? "en-IE" : "pt-BR";
+  const crossesYears = rows[0].date.slice(0, 4) !== rows.at(-1).date.slice(0, 4);
+
+  indexes.forEach((rowIndex) => {
+    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    label.setAttribute("class", "exchange-axis-label exchange-date-label");
+    label.setAttribute("x", points[rowIndex].getAttribute("cx"));
+    label.setAttribute("y", labelY);
+    label.setAttribute("text-anchor", "middle");
+    label.textContent = new Date(`${rows[rowIndex].date}T00:00:00`).toLocaleDateString(locale, {
+      day: "2-digit",
+      month: "short",
+      ...(crossesYears ? { year: "2-digit" } : {}),
+    });
+    svg.appendChild(label);
+  });
 }
 
 function zoomExpandedChartWithWheel(event) {

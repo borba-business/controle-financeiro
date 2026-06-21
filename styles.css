@@ -750,6 +750,10 @@ select:focus {
   font-weight: 700;
 }
 
+.exchange-date-label {
+  letter-spacing: 0;
+}
+
 .exchange-line {
   fill: none;
   stroke: currentColor;
@@ -1377,10 +1381,14 @@ tbody tr:last-child td {
   place-items: center;
   width: 40px;
   height: 40px;
+  padding: 0 0 3px;
+  border: 0;
   border-radius: 50%;
   background: var(--surface-2);
   color: var(--text);
   font-size: 1.45rem;
+  font-family: Arial, sans-serif;
+  line-height: 1;
 }
 
 .auth-form,
