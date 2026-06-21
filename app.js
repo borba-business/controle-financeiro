@@ -48,11 +48,11 @@ const STATIC_TRANSLATIONS = {
 Object.assign(STATIC_TRANSLATIONS, {
   "Ler comprovante": "Read receipt",
   "Selecionar comprovante": "Select receipt",
-  "Leitura inteligente": "Smart reading",
+  "Leitura local": "Local reading",
   "Confira os dados encontrados": "Review the extracted data",
   "Usar estes dados": "Use this data",
   "O comprovante já foi descartado. Somente estes dados serão usados para preencher o formulário.": "The receipt has already been discarded. Only this data will be used to fill in the form.",
-  "Fotografe ou selecione uma imagem ou PDF. O arquivo será descartado após a leitura.": "Take a photo or select an image or PDF. The file will be discarded after reading.",
+  "Fotografe ou selecione uma imagem ou PDF. A leitura é feita neste aparelho, sem enviar o arquivo.": "Take a photo or select an image or PDF. Reading happens on this device without uploading the file.",
 });
 
 const PLACEHOLDER_TRANSLATIONS = {
@@ -77,6 +77,9 @@ const STORAGE_KEY = "lurdes-controle-financeiro-v1";
 const AUTH_STORAGE_KEY = "controle-financeiro-auth-v1";
 const SUPABASE_URL = "https://uxioksvzpcogcuplfrdj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_0Rglw4_AS_h3B7IZaqN2GA_0Gic3UnW";
+const TESSERACT_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js";
+const PDFJS_MODULE_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs";
+const PDFJS_WORKER_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
 
 const sampleEntries = [
   entry("2026-06-01", 5, "Receita", "Aposentadoria", "Aposentadoria", "Aposentadoria", "Transferência", "Conta corrente", 4200, "Recebimento mensal"),
@@ -106,6 +109,8 @@ let expandedChartWidth = 1100;
 let expandedChartZoom = 1;
 let expandedChartPan = null;
 let pendingReceiptExtraction = null;
+let tesseractLoader = null;
+let pdfJsLoader = null;
 
 const els = {
   monthFilter: document.querySelector("#monthFilter"),
@@ -396,47 +401,16 @@ async function readReceipt() {
     return;
   }
 
-  const session = await ensureSession();
-  if (!session?.access_token) {
-    setReceiptStatus(ui("Entre na sua conta para usar a leitura inteligente.", "Sign in to use smart receipt reading."), "error");
-    els.receiptFile.value = "";
-    openAuthDialog();
-    return;
-  }
-
   els.selectReceipt.disabled = true;
-  setReceiptStatus(ui("Lendo o comprovante com segurança...", "Reading the receipt securely..."));
+  setReceiptStatus(ui("Preparando a leitura local...", "Preparing local reading..."));
 
   try {
-    const fileData = await fileToDataUrl(file);
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/read-receipt`, {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        fileName: file.name,
-        mimeType: file.type,
-        fileData,
-        context: {
-          language: state.language,
-          today: new Date().toISOString().slice(0, 10),
-          categories: currentCategoryOptions(),
-          payments: state.payments,
-          accounts: state.accounts,
-          incomeSources: state.incomeSources,
-          baseCurrency: state.baseCurrency,
-        },
-      }),
-    });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(payload?.error || ui("Não foi possível ler o comprovante.", "Could not read the receipt."));
-
-    pendingReceiptExtraction = payload.data;
+    const localReading = file.type === "application/pdf"
+      ? await readReceiptPdfLocally(file)
+      : await readReceiptImageLocally(file);
+    pendingReceiptExtraction = extractReceiptFields(localReading.text, localReading.confidence);
     showReceiptReview(pendingReceiptExtraction);
-    setReceiptStatus(ui("Leitura concluída. Confira os dados antes de salvar.", "Reading complete. Review the data before saving."), "success");
+    setReceiptStatus(ui("Leitura local concluída. Confira todos os dados antes de salvar.", "Local reading complete. Review all data before saving."), "success");
   } catch (error) {
     setReceiptStatus(error.message || ui("Não foi possível ler o comprovante.", "Could not read the receipt."), "error");
   } finally {
@@ -445,13 +419,268 @@ async function readReceipt() {
   }
 }
 
-function fileToDataUrl(file) {
+function loadExternalScript(url, id) {
+  const loaded = document.querySelector(`#${id}`);
+  if (loaded) return Promise.resolve();
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error(ui("Não foi possível abrir o arquivo.", "Could not open the file.")));
-    reader.readAsDataURL(file);
+    const script = document.createElement("script");
+    script.id = id;
+    script.src = url;
+    script.crossOrigin = "anonymous";
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(ui("Não foi possível carregar o leitor local. Verifique a conexão.", "Could not load the local reader. Check your connection.")));
+    document.head.append(script);
   });
+}
+
+async function loadTesseract() {
+  if (window.Tesseract) return window.Tesseract;
+  if (!tesseractLoader) {
+    tesseractLoader = loadExternalScript(TESSERACT_SCRIPT_URL, "tesseract-local-reader")
+      .then(() => window.Tesseract)
+      .catch((error) => {
+        tesseractLoader = null;
+        throw error;
+      });
+  }
+  return tesseractLoader;
+}
+
+async function loadPdfJs() {
+  if (!pdfJsLoader) {
+    pdfJsLoader = import(PDFJS_MODULE_URL).then((pdfjs) => {
+      pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+      return pdfjs;
+    }).catch((error) => {
+      pdfJsLoader = null;
+      throw error;
+    });
+  }
+  return pdfJsLoader;
+}
+
+function updateOcrProgress(progress) {
+  if (progress.status !== "recognizing text") return;
+  const percentage = Math.max(1, Math.min(100, Math.round((progress.progress || 0) * 100)));
+  setReceiptStatus(ui(`Lendo o comprovante neste aparelho... ${percentage}%`, `Reading the receipt on this device... ${percentage}%`));
+}
+
+async function imageFileToCanvas(file) {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+      image.src = objectUrl;
+    });
+
+    const targetWidth = Math.min(2200, Math.max(image.naturalWidth, 1500));
+    const scale = targetWidth / image.naturalWidth;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(image.naturalWidth * scale);
+    canvas.height = Math.round(image.naturalHeight * scale);
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+    for (let index = 0; index < pixels.data.length; index += 4) {
+      const gray = (pixels.data[index] * 0.299) + (pixels.data[index + 1] * 0.587) + (pixels.data[index + 2] * 0.114);
+      const adjusted = Math.max(0, Math.min(255, ((gray - 128) * 1.18) + 128));
+      pixels.data[index] = adjusted;
+      pixels.data[index + 1] = adjusted;
+      pixels.data[index + 2] = adjusted;
+    }
+    context.putImageData(pixels, 0, 0);
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function recognizeCanvas(canvas) {
+  const tesseract = await loadTesseract();
+  const result = await tesseract.recognize(canvas, "eng+por", { logger: updateOcrProgress });
+  return {
+    text: String(result?.data?.text || ""),
+    confidence: Number(result?.data?.confidence || 0),
+  };
+}
+
+async function readReceiptImageLocally(file) {
+  const canvas = await imageFileToCanvas(file);
+  return recognizeCanvas(canvas);
+}
+
+async function readReceiptPdfLocally(file) {
+  setReceiptStatus(ui("Abrindo o PDF neste aparelho...", "Opening the PDF on this device..."));
+  const pdfjs = await loadPdfJs();
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const pageCount = Math.min(pdf.numPages, 3);
+  const texts = [];
+  const confidences = [];
+
+  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const digitalText = content.items.map((item) => item.str || "").join(" ").trim();
+    if (digitalText.length >= 60) {
+      texts.push(digitalText);
+      confidences.push(98);
+      continue;
+    }
+
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    const reading = await recognizeCanvas(canvas);
+    texts.push(reading.text);
+    confidences.push(reading.confidence);
+  }
+
+  if (pdf.numPages > pageCount) {
+    texts.push(ui("Aviso: somente as três primeiras páginas foram analisadas.", "Warning: only the first three pages were analyzed."));
+  }
+  return {
+    text: texts.join("\n"),
+    confidence: confidences.length ? confidences.reduce((sum, value) => sum + value, 0) / confidences.length : 0,
+  };
+}
+
+function receiptLines(text) {
+  return String(text || "").split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+}
+
+function findLabeledReceiptValue(lines, labels) {
+  for (const rawLabel of labels) {
+    const label = normalizedValue(rawLabel);
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      const normalizedLine = normalizedValue(line);
+      const matches = normalizedLine === label || normalizedLine.startsWith(`${label}:`) || normalizedLine.startsWith(`${label} `);
+      if (!matches) continue;
+      if (normalizedLine !== label) {
+        const labelWords = label.split(/\s+/).length;
+        const inlineValue = line.replace(/^.*?:/, "").trim() === line.trim()
+          ? line.split(/\s+/).slice(labelWords).join(" ").trim()
+          : line.replace(/^.*?:/, "").trim();
+        if (inlineValue) return inlineValue;
+      }
+      if (lines[index + 1]) return lines[index + 1];
+    }
+  }
+  return "";
+}
+
+function parseReceiptNumber(value) {
+  let clean = String(value || "").replace(/[^\d.,-]/g, "").replace(/^-/, "");
+  if (!clean) return 0;
+  const comma = clean.lastIndexOf(",");
+  const dot = clean.lastIndexOf(".");
+  if (comma >= 0 && dot >= 0) {
+    clean = comma > dot ? clean.replace(/\./g, "").replace(",", ".") : clean.replace(/,/g, "");
+  } else if (comma >= 0) {
+    clean = clean.replace(/\./g, "").replace(",", ".");
+  }
+  const parsed = Number(clean);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function extractReceiptAmount(lines, text) {
+  const labeled = findLabeledReceiptValue(lines, ["amount", "valor", "total", "montante", "value"]);
+  const labeledAmount = parseReceiptNumber(labeled);
+  if (labeledAmount > 0) return labeledAmount;
+  const currencyAmount = String(text).match(/(?:EUR|BRL|USD|R\$|€|US\$|\$)\s*([\d.,]+)|([\d.,]+)\s*(?:EUR|BRL|USD|€)/i);
+  return parseReceiptNumber(currencyAmount?.[1] || currencyAmount?.[2]);
+}
+
+function validReceiptDate(year, month, day) {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return "";
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function extractReceiptDate(text) {
+  const source = String(text || "");
+  const iso = source.match(/\b(20\d{2})[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])\b/);
+  if (iso) return validReceiptDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+  const numeric = source.match(/\b(0?[1-9]|[12]\d|3[01])[-/.](0?[1-9]|1[0-2])[-/.](20\d{2})\b/);
+  if (numeric) return validReceiptDate(Number(numeric[3]), Number(numeric[2]), Number(numeric[1]));
+
+  const months = {
+    jan: 1, january: 1, janeiro: 1, fev: 2, feb: 2, february: 2, fevereiro: 2,
+    mar: 3, march: 3, marco: 3, abr: 4, apr: 4, april: 4, abril: 4,
+    mai: 5, may: 5, maio: 5, jun: 6, june: 6, junho: 6,
+    jul: 7, july: 7, julho: 7, ago: 8, aug: 8, august: 8, agosto: 8,
+    set: 9, sep: 9, sept: 9, september: 9, setembro: 9,
+    out: 10, oct: 10, october: 10, outubro: 10,
+    nov: 11, november: 11, novembro: 11, dez: 12, dec: 12, december: 12, dezembro: 12,
+  };
+  const named = normalizedValue(source).match(/\b(0?[1-9]|[12]\d|3[01])\s+(?:de\s+)?([a-z]+)\.?\s+(?:de\s+)?(20\d{2})\b/);
+  if (!named || !months[named[2]]) return "";
+  return validReceiptDate(Number(named[3]), months[named[2]], Number(named[1]));
+}
+
+function findReceiptOption(text, options) {
+  const normalizedText = normalizedValue(text);
+  return options.find((option) => {
+    const candidate = normalizedValue(option);
+    return candidate.length >= 3 && normalizedText.includes(candidate);
+  }) || "";
+}
+
+function cleanReceiptDescription(value) {
+  return String(value || "").replace(/^[*#:\-\s]+/, "").replace(/\s+/g, " ").trim().slice(0, 120);
+}
+
+function extractReceiptFields(text, ocrConfidence) {
+  const lines = receiptLines(text);
+  if (!lines.length) throw new Error(ui("Nenhum texto foi encontrado. Tente uma imagem mais nítida.", "No text was found. Try a clearer image."));
+
+  const normalizedText = normalizedValue(text);
+  const incomeEvidence = /\b(received|money received|credit received|recebido|recebimento|valor creditado|deposito recebido)\b/.test(normalizedText);
+  const expenseEvidence = /\b(payment details|receiver details|payee|beneficiary|purchase|pagamento|destinatario|transferencia enviada|debito)\b/.test(normalizedText);
+  const type = incomeEvidence && !expenseEvidence ? "Receita" : "Despesa";
+  const description = cleanReceiptDescription(findLabeledReceiptValue(lines, [
+    "payee message", "mensagem ao beneficiário", "mensagem ao beneficiario", "merchant", "estabelecimento",
+    "receiver name", "recipient name", "beneficiary", "favorecido", "destinatário", "destinatario", "name",
+  ]));
+  const amount = extractReceiptAmount(lines, text);
+  const date = extractReceiptDate(text);
+  const currency = /\bBRL\b|R\$/i.test(text) ? "BRL" : (/\bUSD\b|US\$|\$/i.test(text) ? "USD" : (/\bEUR\b|€/i.test(text) ? "EUR" : state.baseCurrency));
+  const category = findReceiptOption(`${description} ${text}`, currentCategoryOptions());
+  let payment = findReceiptOption(text, state.payments);
+  if (!payment && /\b(iban|bic|bank transfer|transferencia|transferência)\b/i.test(text)) {
+    payment = state.payments.find((item) => normalizedValue(item).includes("transfer")) || "";
+  }
+  const account = findReceiptOption(text, state.accounts);
+  const incomeSource = type === "Receita" ? findReceiptOption(text, state.incomeSources) : "";
+  const warnings = [ui("Leitura feita por OCR local. Confirme todos os campos antes de salvar.", "Read with local OCR. Confirm every field before saving.")];
+  if (!date) warnings.push(ui("A data não foi identificada.", "The date was not identified."));
+  if (!amount) warnings.push(ui("O valor não foi identificado.", "The amount was not identified."));
+  if (!description) warnings.push(ui("A descrição precisa ser preenchida.", "The description must be filled in."));
+  if (!category) warnings.push(ui("A categoria precisa ser escolhida.", "The category must be selected."));
+  if (!account) warnings.push(ui("A conta não aparece no comprovante e precisa ser escolhida.", "The account is not shown on the receipt and must be selected."));
+  if (!incomeEvidence && !expenseEvidence) warnings.push(ui("O tipo foi sugerido como Despesa por segurança.", "The type was suggested as Expense for safety."));
+
+  const completeness = [date, amount, description, currency].filter(Boolean).length / 4;
+  const confidence = Math.max(0.25, Math.min(0.98, ((Number(ocrConfidence) || 0) / 100 * 0.65) + (completeness * 0.35)));
+  return {
+    type,
+    date,
+    description,
+    category,
+    payment,
+    account,
+    incomeSource,
+    amount,
+    currency,
+    notes: "",
+    confidence,
+    warnings,
+  };
 }
 
 function showReceiptReview(data) {
