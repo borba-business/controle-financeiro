@@ -48,6 +48,7 @@ const STATIC_TRANSLATIONS = {
 Object.assign(STATIC_TRANSLATIONS, {
   "Ferramentas": "Tools",
   "Ações da planilha": "Spreadsheet actions",
+  "Baixe uma cópia completa dos seus dados ou restaure um arquivo salvo anteriormente.": "Download a complete copy of your data or restore a previously saved file.",
   "Ler comprovante": "Read receipt",
   "Selecionar comprovante": "Select receipt",
   "Leitura local": "Local reading",
@@ -130,6 +131,8 @@ const els = {
   utilityMenuClose: document.querySelector("#utilityMenuClose"),
   utilityMenuBackdrop: document.querySelector("#utilityMenuBackdrop"),
   openBackupPanel: document.querySelector("#openBackupPanel"),
+  backupDialog: document.querySelector("#backupDialog"),
+  closeBackupDialog: document.querySelector("#closeBackupDialog"),
   authButton: document.querySelector("#authButton"),
   authButtonLabel: document.querySelector("#authButtonLabel"),
   clearDataDialog: document.querySelector("#clearDataDialog"),
@@ -205,7 +208,6 @@ const els = {
   notes: document.querySelector("#notes"),
   incomeSourceChart: document.querySelector("#incomeSourceChart"),
   incomeSourcesPanel: document.querySelector("#incomeSourcesPanel"),
-  backupPanel: document.querySelector("#backupPanel"),
   downloadBackup: document.querySelector("#downloadBackup"),
   restoreBackup: document.querySelector("#restoreBackup"),
   backupFile: document.querySelector("#backupFile"),
@@ -483,6 +485,10 @@ function bindEvents() {
   els.utilityMenuClose.addEventListener("click", closeUtilityMenu);
   els.utilityMenuBackdrop.addEventListener("click", closeUtilityMenu);
   els.openBackupPanel.addEventListener("click", openBackupFromUtilityMenu);
+  els.closeBackupDialog.addEventListener("click", closeBackupDialog);
+  els.backupDialog.addEventListener("click", (event) => {
+    if (event.target === els.backupDialog) closeBackupDialog();
+  });
   els.exportCsv.addEventListener("click", closeUtilityMenu);
   els.clearData.addEventListener("click", closeUtilityMenu);
   document.addEventListener("keydown", handleUtilityMenuKeydown);
@@ -2433,10 +2439,13 @@ function handleUtilityMenuKeydown(event) {
 }
 
 function openBackupFromUtilityMenu() {
-  activeRegistrationTab = "backup";
-  renderRegistrationTabs();
   closeUtilityMenu();
-  document.querySelector(".registrations-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  els.backupDialog.showModal();
+  requestAnimationFrame(() => els.closeBackupDialog.focus());
+}
+
+function closeBackupDialog() {
+  els.backupDialog.close();
 }
 
 function renderVisualTabs() {
@@ -2452,7 +2461,6 @@ function renderRegistrationTabs() {
   els.entryForm.classList.toggle("hidden", activeRegistrationTab !== "entry");
   els.incomeSourcesPanel.classList.toggle("hidden", activeRegistrationTab !== "incomeSources");
   els.nameSheetPanel.classList.toggle("hidden", activeRegistrationTab !== "name");
-  els.backupPanel.classList.toggle("hidden", activeRegistrationTab !== "backup");
   renderGeneralRegistrations();
 }
 
@@ -2547,6 +2555,7 @@ async function restoreBackup(event) {
     persist();
     clearForm();
     render();
+    closeBackupDialog();
     alert("Backup restaurado com sucesso.");
   } catch (error) {
     alert(error.message || "Não foi possível restaurar o backup.");

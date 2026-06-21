@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=37" />
+    <link rel="stylesheet" href="./styles.css?v=38" />
   </head>
   <body>
     <main class="app-shell">
@@ -213,17 +213,6 @@
               <div id="incomeSourcesList" class="editable-list" style="margin-top: 14px;"></div>
             </section>
 
-            <section id="backupPanel" class="registration-tab-panel backup-panel hidden">
-              <div>
-                <p class="eyebrow">Cópia completa</p>
-                <h3>Backup e recuperação</h3>
-              </div>
-              <div class="backup-actions">
-                <button id="downloadBackup" class="primary" type="button">Baixar backup</button>
-                <button id="restoreBackup" class="secondary" type="button">Restaurar backup</button>
-                <input id="backupFile" class="hidden" type="file" accept="application/json,.json" />
-              </div>
-            </section>
           </section>
         </section>
 
@@ -385,6 +374,24 @@
       </nav>
     </aside>
 
+    <dialog id="backupDialog" class="backup-dialog" aria-labelledby="backupDialogTitle">
+      <div class="backup-dialog-content">
+        <div class="backup-dialog-header">
+          <div>
+            <p class="eyebrow">Cópia completa</p>
+            <h2 id="backupDialogTitle">Backup e recuperação</h2>
+          </div>
+          <button id="closeBackupDialog" class="icon-close" type="button" aria-label="Fechar" title="Fechar">&times;</button>
+        </div>
+        <p class="backup-dialog-description">Baixe uma cópia completa dos seus dados ou restaure um arquivo salvo anteriormente.</p>
+        <div class="backup-dialog-actions">
+          <button id="downloadBackup" class="primary" type="button">Baixar backup</button>
+          <button id="restoreBackup" class="secondary" type="button">Restaurar backup</button>
+          <input id="backupFile" class="hidden" type="file" accept="application/json,.json" />
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="exchangeChartDialog" class="exchange-chart-dialog" aria-labelledby="expandedExchangeChartTitle">
       <div class="exchange-chart-dialog-content">
         <div class="exchange-chart-dialog-header">
@@ -487,6 +494,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=37"></script>
+    <script src="./app.js?v=38"></script>
   </body>
 </html>

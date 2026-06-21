@@ -1916,24 +1916,48 @@ tbody tr:last-child td {
   font-size: 0.82rem;
 }
 
-.backup-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+.backup-dialog {
+  width: min(560px, calc(100% - 32px));
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-2);
-  padding: 20px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
 }
 
-.backup-panel h3 {
-  margin: 4px 0 0;
-  font-size: 1.05rem;
+.backup-dialog::backdrop {
+  background: rgba(5, 10, 9, 0.76);
+  backdrop-filter: blur(5px);
 }
 
-.backup-actions {
+.backup-dialog-content {
+  display: grid;
+  gap: 20px;
+  padding: 26px;
+}
+
+.backup-dialog-header {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.backup-dialog-header h2 {
+  margin: 4px 0 0;
+  font-size: 1.35rem;
+}
+
+.backup-dialog-description {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.backup-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
   gap: 10px;
 }
 
@@ -2178,8 +2202,7 @@ tbody tr:last-child td {
     padding-inline: 8px;
   }
 
-  .backup-panel,
-  .backup-actions {
+  .backup-dialog-actions {
     align-items: stretch;
     flex-direction: column;
   }
