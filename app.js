@@ -120,6 +120,7 @@ let pendingReceiptExtraction = null;
 let tesseractLoader = null;
 let pdfJsLoader = null;
 let moduleResizeObserver = null;
+let lastExchangeChartWidth = 0;
 
 const els = {
   sortableModules: null,
@@ -371,6 +372,11 @@ function initializeMasonryLayout() {
 function refreshMasonryLayout() {
   if (!els.sortableModules) return;
   const modules = [...els.sortableModules.querySelectorAll(":scope > [data-module-id]")];
+  const exchangeWidth = Math.round(els.exchangeChart?.clientWidth || 0);
+  if (exchangeWidth && Math.abs(exchangeWidth - lastExchangeChartWidth) > 2) {
+    lastExchangeChartWidth = exchangeWidth;
+    renderExchangeChart();
+  }
   if (window.matchMedia("(max-width: 1180px)").matches) {
     modules.forEach((module) => module.style.removeProperty("grid-row-end"));
     return;
@@ -384,6 +390,7 @@ function refreshMasonryLayout() {
     const height = module.getBoundingClientRect().height;
     module.style.gridRowEnd = `span ${Math.max(1, Math.ceil((height + rowGap) / (rowHeight + rowGap)))}`;
   });
+
 }
 
 function addModuleDragHandle(module) {
@@ -445,7 +452,10 @@ function toggleModuleSize(moduleId) {
   state.moduleSizes = normalizeModuleSizes(state.moduleSizes);
   state.moduleSizes[moduleId] = state.moduleSizes[moduleId] === "full" ? "half" : "full";
   applyModuleSizes();
-  requestAnimationFrame(refreshMasonryLayout);
+  requestAnimationFrame(() => {
+    if (moduleId === "exchange") lastExchangeChartWidth = 0;
+    refreshMasonryLayout();
+  });
   persist();
 }
 
@@ -1636,8 +1646,10 @@ function renderExchangeChart() {
   els.exchangeMin.textContent = formatExchangeRate(minimum, target);
   els.exchangeMax.textContent = formatExchangeRate(maximum, target);
 
-  const width = 720;
-  const height = 270;
+  const exchangeModule = els.exchangeChart.closest('[data-module-id="exchange"]');
+  const isFullWidth = exchangeModule?.dataset.moduleSize === "full";
+  const width = Math.max(320, Math.round(els.exchangeChart.clientWidth || 720));
+  const height = isFullWidth ? 360 : 300;
   const padding = { top: 20, right: 18, bottom: 38, left: 62 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;

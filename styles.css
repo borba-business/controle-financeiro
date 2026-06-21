@@ -1002,8 +1002,12 @@ select:focus {
 .exchange-chart svg {
   display: block;
   width: 100%;
-  height: 320px;
+  height: 300px;
   min-height: 270px;
+}
+
+.sortable-modules > [data-module-id="exchange"][data-module-size="full"] .exchange-chart svg {
+  height: 360px;
 }
 
 .exchange-grid-line {
