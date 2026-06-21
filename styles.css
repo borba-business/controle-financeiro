@@ -542,6 +542,7 @@ select:focus {
 }
 
 .exchange-chart {
+  position: relative;
   width: 100%;
   min-height: 270px;
   overflow: hidden;
@@ -576,12 +577,114 @@ select:focus {
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-exchange-line 0.8s ease forwards;
+}
+
+.exchange-area {
+  fill: currentColor;
+  opacity: 0.07;
 }
 
 .exchange-point {
   fill: var(--surface-2);
   stroke: currentColor;
   stroke-width: 2;
+  cursor: crosshair;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.18s ease, fill 0.18s ease, stroke-width 0.18s ease, filter 0.18s ease;
+}
+
+.exchange-point:hover,
+.exchange-point.active,
+.exchange-point:focus {
+  fill: var(--primary);
+  stroke: var(--text);
+  stroke-width: 2.5;
+  transform: scale(1.8);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--primary) 65%, transparent));
+  outline: none;
+}
+
+.exchange-hover-line {
+  stroke: color-mix(in srgb, var(--primary) 50%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.exchange-hover-line.visible {
+  opacity: 1;
+}
+
+.exchange-tooltip {
+  position: absolute;
+  z-index: 3;
+  min-width: 154px;
+  max-width: 220px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 94%, var(--bg));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, calc(-100% - 14px)) scale(0.96);
+  transform-origin: bottom center;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.exchange-tooltip.visible {
+  opacity: 1;
+  transform: translate(-50%, calc(-100% - 14px)) scale(1);
+}
+
+.exchange-tooltip span,
+.exchange-tooltip small,
+.exchange-tooltip strong {
+  display: block;
+}
+
+.exchange-tooltip span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.exchange-tooltip strong {
+  margin-top: 3px;
+  font-size: 0.94rem;
+}
+
+.exchange-tooltip small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+@keyframes draw-exchange-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exchange-line {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .exchange-point,
+  .exchange-tooltip,
+  .exchange-hover-line {
+    transition: none;
+  }
 }
 
 .option-picker {

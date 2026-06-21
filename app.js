@@ -826,6 +826,7 @@ function renderExchangeChart() {
   const x = (index) => padding.left + (index / Math.max(rows.length - 1, 1)) * plotWidth;
   const y = (value) => padding.top + ((chartMax - value) / chartRange) * plotHeight;
   const points = rows.map((item, index) => `${x(index).toFixed(2)},${y(item.value).toFixed(2)}`).join(" ");
+  const areaPoints = `${padding.left},${padding.top + plotHeight} ${points} ${width - padding.right},${padding.top + plotHeight}`;
   const grid = Array.from({ length: 5 }, (_, index) => {
     const value = chartMax - (index / 4) * chartRange;
     const lineY = padding.top + (index / 4) * plotHeight;
@@ -837,14 +838,67 @@ function renderExchangeChart() {
     const label = new Date(`${rows[index].date}T00:00:00`).toLocaleDateString(state.language === "en" ? "en-IE" : "pt-BR", { day: "2-digit", month: "short" });
     return `<text class="exchange-axis-label" x="${x(index)}" y="${height - 12}" text-anchor="middle">${label}</text>`;
   }).join("");
-  const pointMarkers = rows.map((item, index) => `<circle class="exchange-point" cx="${x(index)}" cy="${y(item.value)}" r="3"><title>${item.date}: ${formatExchangeRate(item.value, target)}</title></circle>`).join("");
+  const pointMarkers = rows.map((item, index) => {
+    const accessibleLabel = `${item.date}: ${formatExchangeRate(item.value, target)}`;
+    return `<circle class="exchange-point" cx="${x(index)}" cy="${y(item.value)}" r="3" tabindex="0" data-date="${item.date}" data-value="${item.value}" aria-label="${accessibleLabel}"></circle>`;
+  }).join("");
 
   els.exchangeChart.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${source}/${target}">
     ${grid}
     ${dateLabels}
-    <polyline class="exchange-line" points="${points}"></polyline>
+    <polygon class="exchange-area" points="${areaPoints}"></polygon>
+    <line class="exchange-hover-line" x1="0" y1="${padding.top}" x2="0" y2="${padding.top + plotHeight}"></line>
+    <polyline class="exchange-line" pathLength="1" points="${points}"></polyline>
     ${pointMarkers}
-  </svg>`;
+  </svg>
+  <div class="exchange-tooltip" role="status"></div>`;
+  bindExchangeChartInteractions(source, target);
+}
+
+function bindExchangeChartInteractions(source, target) {
+  const tooltip = els.exchangeChart.querySelector(".exchange-tooltip");
+  const guide = els.exchangeChart.querySelector(".exchange-hover-line");
+  const points = [...els.exchangeChart.querySelectorAll(".exchange-point")];
+
+  const hideTooltip = () => {
+    tooltip.classList.remove("visible");
+    guide.classList.remove("visible");
+    points.forEach((point) => point.classList.remove("active"));
+  };
+
+  const showTooltip = (point) => {
+    points.forEach((item) => item.classList.toggle("active", item === point));
+    const date = new Date(`${point.dataset.date}T00:00:00`).toLocaleDateString(state.language === "en" ? "en-IE" : "pt-BR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+    tooltip.innerHTML = `<span>${source}/${target}</span><strong>${formatExchangeRate(Number(point.dataset.value), target)}</strong><small>${date}</small>`;
+
+    const chartRect = els.exchangeChart.getBoundingClientRect();
+    const pointRect = point.getBoundingClientRect();
+    const pointX = pointRect.left + pointRect.width / 2 - chartRect.left;
+    const pointY = pointRect.top + pointRect.height / 2 - chartRect.top;
+    const safeX = Math.max(90, Math.min(chartRect.width - 90, pointX));
+    tooltip.style.left = `${safeX}px`;
+    tooltip.style.top = `${Math.max(70, pointY)}px`;
+    tooltip.classList.add("visible");
+
+    const guideX = point.getAttribute("cx");
+    guide.setAttribute("x1", guideX);
+    guide.setAttribute("x2", guideX);
+    guide.classList.add("visible");
+  };
+
+  points.forEach((point) => {
+    point.addEventListener("pointerenter", () => showTooltip(point));
+    point.addEventListener("pointerdown", () => showTooltip(point));
+    point.addEventListener("focus", () => showTooltip(point));
+    point.addEventListener("pointerleave", hideTooltip);
+    point.addEventListener("blur", hideTooltip);
+  });
+
+  els.exchangeChart.querySelector("svg").addEventListener("pointerleave", hideTooltip);
 }
 
 function ratesForEntry(item) {
