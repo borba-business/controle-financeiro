@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=21" />
+    <link rel="stylesheet" href="./styles.css?v=22" />
   </head>
   <body>
     <main class="app-shell">
@@ -346,9 +346,16 @@
             <p class="eyebrow">Visualização ampliada</p>
             <h2 id="expandedExchangeChartTitle">Gráfico Cotações Tempo Real</h2>
           </div>
-          <button id="closeExchangeChartDialog" class="icon-close" type="button" aria-label="Fechar gráfico" title="Fechar gráfico">&times;</button>
+          <div class="exchange-dialog-tools">
+            <div class="exchange-zoom-controls" aria-label="Controles de zoom">
+              <button id="exchangeZoomOut" type="button" aria-label="Diminuir zoom" title="Diminuir zoom">&minus;</button>
+              <button id="exchangeZoomReset" type="button" aria-label="Restaurar zoom" title="Restaurar zoom"><span id="exchangeZoomLevel">100%</span></button>
+              <button id="exchangeZoomIn" type="button" aria-label="Aumentar zoom" title="Aumentar zoom">+</button>
+            </div>
+            <button id="closeExchangeChartDialog" class="icon-close" type="button" aria-label="Fechar gráfico" title="Fechar gráfico">&times;</button>
+          </div>
         </div>
-        <p class="exchange-scroll-hint">Arraste a barra horizontal para consultar outras datas.</p>
+        <p class="exchange-scroll-hint">Use a roda do mouse para aplicar zoom. Clique e arraste para navegar pelas datas.</p>
         <div id="expandedExchangeChartScroll" class="expanded-exchange-chart-scroll">
           <div id="expandedExchangeChart" class="exchange-chart expanded-exchange-chart"></div>
         </div>
@@ -414,6 +421,6 @@
       </div>
     </dialog>
 
-    <script src="./app.js?v=21"></script>
+    <script src="./app.js?v=22"></script>
   </body>
 </html>

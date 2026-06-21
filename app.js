@@ -39,7 +39,8 @@ const STATIC_TRANSLATIONS = {
   "Par de moedas": "Currency pair", "Período": "Period", "1 mês": "1 month", "3 meses": "3 months", "6 meses": "6 months", "1 ano": "1 year",
   "Personalizado": "Custom", "Data inicial": "Start date", "Data final": "End date", "Pesquisar": "Search",
   "Visualização ampliada": "Expanded view", "Fechar gráfico": "Close chart",
-  "Arraste a barra horizontal para consultar outras datas.": "Drag the horizontal scrollbar to view other dates.",
+  "Use a roda do mouse para aplicar zoom. Clique e arraste para navegar pelas datas.": "Use the mouse wheel to zoom. Click and drag to navigate through dates.",
+  "Controles de zoom": "Zoom controls", "Diminuir zoom": "Zoom out", "Restaurar zoom": "Reset zoom", "Aumentar zoom": "Zoom in",
   "Atual": "Current", "Mínima": "Low", "Máxima": "High", "Digite": "Type", "para confirmar": "to confirm",
   "Todos os lançamentos de receitas e despesas serão apagados permanentemente. Os cadastros e o nome da planilha serão mantidos.": "All income and expense entries will be permanently deleted. Records and the spreadsheet name will be kept."
 };
@@ -88,6 +89,10 @@ let syncInProgress = false;
 let authReady = false;
 let conversionRequestId = 0;
 let exchangeChartMeta = { rowsCount: 0, source: "EUR", target: "BRL" };
+let expandedChartBaseWidth = 1100;
+let expandedChartWidth = 1100;
+let expandedChartZoom = 1;
+let expandedChartPan = null;
 
 const els = {
   monthFilter: document.querySelector("#monthFilter"),
@@ -158,6 +163,10 @@ const els = {
   closeExchangeChartDialog: document.querySelector("#closeExchangeChartDialog"),
   expandedExchangeChartScroll: document.querySelector("#expandedExchangeChartScroll"),
   expandedExchangeChart: document.querySelector("#expandedExchangeChart"),
+  exchangeZoomOut: document.querySelector("#exchangeZoomOut"),
+  exchangeZoomReset: document.querySelector("#exchangeZoomReset"),
+  exchangeZoomIn: document.querySelector("#exchangeZoomIn"),
+  exchangeZoomLevel: document.querySelector("#exchangeZoomLevel"),
   notes: document.querySelector("#notes"),
   incomeSourceChart: document.querySelector("#incomeSourceChart"),
   incomeSourcesPanel: document.querySelector("#incomeSourcesPanel"),
@@ -264,6 +273,14 @@ function bindEvents() {
     if (!event.target.closest(".exchange-point")) openExpandedExchangeChart();
   });
   els.closeExchangeChartDialog.addEventListener("click", () => els.exchangeChartDialog.close());
+  els.exchangeZoomOut.addEventListener("click", () => setExpandedChartZoom(expandedChartZoom / 1.35));
+  els.exchangeZoomReset.addEventListener("click", () => setExpandedChartZoom(1));
+  els.exchangeZoomIn.addEventListener("click", () => setExpandedChartZoom(expandedChartZoom * 1.35));
+  els.expandedExchangeChartScroll.addEventListener("wheel", zoomExpandedChartWithWheel, { passive: false });
+  els.expandedExchangeChartScroll.addEventListener("pointerdown", startExpandedChartPan);
+  els.expandedExchangeChartScroll.addEventListener("pointermove", moveExpandedChartPan);
+  els.expandedExchangeChartScroll.addEventListener("pointerup", stopExpandedChartPan);
+  els.expandedExchangeChartScroll.addEventListener("pointercancel", stopExpandedChartPan);
   els.exchangeChartDialog.addEventListener("click", (event) => {
     if (event.target === els.exchangeChartDialog) els.exchangeChartDialog.close();
   });
@@ -1075,15 +1092,92 @@ function openExpandedExchangeChart() {
   const sourceSvg = els.exchangeChart.querySelector("svg");
   if (!sourceSvg || exchangeChartMeta.rowsCount === 0 || els.exchangeChartDialog.open) return;
 
-  const chartWidth = Math.max(1100, exchangeChartMeta.rowsCount * 5);
-  els.expandedExchangeChart.style.width = `${chartWidth}px`;
+  expandedChartBaseWidth = Math.max(1100, exchangeChartMeta.rowsCount * 5);
+  expandedChartWidth = expandedChartBaseWidth;
+  expandedChartZoom = 1;
+  els.exchangeZoomLevel.textContent = "100%";
+  els.expandedExchangeChart.style.width = `${expandedChartWidth}px`;
   els.expandedExchangeChart.innerHTML = `${sourceSvg.outerHTML}<div class="exchange-tooltip" role="status"></div>`;
+  resizeExpandedSvg(expandedChartWidth, 520, true);
   bindExchangeChartInteractions(exchangeChartMeta.source, exchangeChartMeta.target, els.expandedExchangeChart);
   els.exchangeChartDialog.showModal();
 
   requestAnimationFrame(() => {
     els.expandedExchangeChartScroll.scrollLeft = els.expandedExchangeChartScroll.scrollWidth - els.expandedExchangeChartScroll.clientWidth;
   });
+}
+
+function resizeExpandedSvg(targetWidth, targetHeight = 520, initial = false) {
+  const svg = els.expandedExchangeChart.querySelector("svg");
+  if (!svg) return;
+
+  const scaleX = initial ? targetWidth / 720 : targetWidth / expandedChartWidth;
+  const scaleY = initial ? targetHeight / 270 : 1;
+  const horizontalAttributes = ["x", "x1", "x2", "cx"];
+  const verticalAttributes = ["y", "y1", "y2", "cy"];
+
+  svg.querySelectorAll("*").forEach((element) => {
+    horizontalAttributes.forEach((attribute) => {
+      if (element.hasAttribute(attribute)) element.setAttribute(attribute, Number(element.getAttribute(attribute)) * scaleX);
+    });
+    verticalAttributes.forEach((attribute) => {
+      if (element.hasAttribute(attribute)) element.setAttribute(attribute, Number(element.getAttribute(attribute)) * scaleY);
+    });
+    if (element.hasAttribute("points")) {
+      const points = element.getAttribute("points").trim().split(/\s+/).map((point) => {
+        const [pointX, pointY] = point.split(",").map(Number);
+        return `${pointX * scaleX},${pointY * scaleY}`;
+      });
+      element.setAttribute("points", points.join(" "));
+    }
+  });
+
+  svg.setAttribute("viewBox", `0 0 ${targetWidth} ${targetHeight}`);
+  svg.style.width = `${targetWidth}px`;
+  svg.style.height = `${targetHeight}px`;
+}
+
+function setExpandedChartZoom(nextZoom, focalX = null) {
+  if (!els.exchangeChartDialog.open) return;
+  const scroll = els.expandedExchangeChartScroll;
+  const zoom = Math.min(8, Math.max(1, nextZoom));
+  const localFocalX = focalX ?? scroll.clientWidth / 2;
+  const contentRatio = (scroll.scrollLeft + localFocalX) / Math.max(expandedChartWidth, 1);
+  const newWidth = expandedChartBaseWidth * zoom;
+
+  resizeExpandedSvg(newWidth, 520, false);
+  expandedChartWidth = newWidth;
+  expandedChartZoom = zoom;
+  els.expandedExchangeChart.style.width = `${newWidth}px`;
+  els.exchangeZoomLevel.textContent = `${Math.round(zoom * 100)}%`;
+  scroll.scrollLeft = contentRatio * newWidth - localFocalX;
+}
+
+function zoomExpandedChartWithWheel(event) {
+  if (!els.exchangeChartDialog.open) return;
+  event.preventDefault();
+  const scrollRect = els.expandedExchangeChartScroll.getBoundingClientRect();
+  const focalX = event.clientX - scrollRect.left;
+  const factor = event.deltaY < 0 ? 1.18 : 1 / 1.18;
+  setExpandedChartZoom(expandedChartZoom * factor, focalX);
+}
+
+function startExpandedChartPan(event) {
+  if (event.button !== 0 || event.target.closest(".exchange-point")) return;
+  expandedChartPan = { pointerId: event.pointerId, startX: event.clientX, scrollLeft: els.expandedExchangeChartScroll.scrollLeft };
+  els.expandedExchangeChartScroll.classList.add("is-panning");
+  els.expandedExchangeChartScroll.setPointerCapture(event.pointerId);
+}
+
+function moveExpandedChartPan(event) {
+  if (!expandedChartPan || expandedChartPan.pointerId !== event.pointerId) return;
+  els.expandedExchangeChartScroll.scrollLeft = expandedChartPan.scrollLeft - (event.clientX - expandedChartPan.startX);
+}
+
+function stopExpandedChartPan(event) {
+  if (!expandedChartPan || expandedChartPan.pointerId !== event.pointerId) return;
+  els.expandedExchangeChartScroll.classList.remove("is-panning");
+  expandedChartPan = null;
 }
 
 function ratesForEntry(item) {
