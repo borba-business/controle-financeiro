@@ -74,6 +74,13 @@ const DEFAULT_ACCOUNTS = ["Carteira", "Conta corrente", "Poupança", "Cartão", 
 const DEFAULT_OWNER_NAME = "Lurdes Camargo";
 const NEW_USER_OWNER_NAME = "Minha Planilha";
 const DEFAULT_MODULE_ORDER = ["dashboard", "registrations", "analysis", "exchange", "history"];
+const DEFAULT_MODULE_SIZES = {
+  dashboard: "full",
+  registrations: "half",
+  analysis: "half",
+  exchange: "half",
+  history: "full",
+};
 const STORAGE_KEY = "lurdes-controle-financeiro-v1";
 const AUTH_STORAGE_KEY = "controle-financeiro-auth-v1";
 const SUPABASE_URL = "https://uxioksvzpcogcuplfrdj.supabase.co";
@@ -112,6 +119,7 @@ let expandedChartPan = null;
 let pendingReceiptExtraction = null;
 let tesseractLoader = null;
 let pdfJsLoader = null;
+let moduleResizeObserver = null;
 
 const els = {
   sortableModules: null,
@@ -295,6 +303,13 @@ function normalizeModuleOrder(order) {
   return [...unique, ...DEFAULT_MODULE_ORDER.filter((id) => !unique.includes(id))];
 }
 
+function normalizeModuleSizes(sizes) {
+  return Object.fromEntries(DEFAULT_MODULE_ORDER.map((id) => [
+    id,
+    sizes?.[id] === "full" || sizes?.[id] === "half" ? sizes[id] : DEFAULT_MODULE_SIZES[id],
+  ]));
+}
+
 function initializeModuleLayout() {
   const moduleDefinitions = [
     ["dashboard", document.querySelector(".dashboard-panel")],
@@ -321,6 +336,8 @@ function initializeModuleLayout() {
 
   document.querySelector(".workspace")?.remove();
   applyModuleOrder();
+  applyModuleSizes();
+  initializeMasonryLayout();
 
   if (!window.Sortable) return;
   window.Sortable.create(container, {
@@ -333,7 +350,39 @@ function initializeModuleLayout() {
     forceFallback: true,
     fallbackOnBody: true,
     swapThreshold: 0.65,
-    onEnd: saveModuleOrder,
+    onEnd: () => {
+      saveModuleOrder();
+      requestAnimationFrame(refreshMasonryLayout);
+    },
+  });
+}
+
+function initializeMasonryLayout() {
+  if (!els.sortableModules) return;
+  moduleResizeObserver?.disconnect();
+  if ("ResizeObserver" in window) {
+    moduleResizeObserver = new ResizeObserver(() => requestAnimationFrame(refreshMasonryLayout));
+    for (const module of els.sortableModules.children) moduleResizeObserver.observe(module);
+  }
+  window.addEventListener("resize", refreshMasonryLayout);
+  requestAnimationFrame(refreshMasonryLayout);
+}
+
+function refreshMasonryLayout() {
+  if (!els.sortableModules) return;
+  const modules = [...els.sortableModules.querySelectorAll(":scope > [data-module-id]")];
+  if (window.matchMedia("(max-width: 1180px)").matches) {
+    modules.forEach((module) => module.style.removeProperty("grid-row-end"));
+    return;
+  }
+
+  const styles = getComputedStyle(els.sortableModules);
+  const rowHeight = Number.parseFloat(styles.gridAutoRows) || 4;
+  const rowGap = Number.parseFloat(styles.rowGap) || 20;
+  modules.forEach((module) => {
+    module.style.removeProperty("grid-row-end");
+    const height = module.getBoundingClientRect().height;
+    module.style.gridRowEnd = `span ${Math.max(1, Math.ceil((height + rowGap) / (rowHeight + rowGap)))}`;
   });
 }
 
@@ -350,8 +399,12 @@ function addModuleDragHandle(module) {
   handle.setAttribute("aria-label", `Mover ${heading.textContent.trim()}`);
   handle.title = "Arrastar para reorganizar";
   handle.innerHTML = '<span aria-hidden="true">&#8942;&#8942;</span>';
+  const sizeToggle = document.createElement("button");
+  sizeToggle.className = "module-size-toggle";
+  sizeToggle.type = "button";
+  sizeToggle.addEventListener("click", () => toggleModuleSize(module.dataset.moduleId));
   title.insertBefore(headingGroup, heading);
-  headingGroup.append(handle, heading);
+  headingGroup.append(handle, heading, sizeToggle);
 }
 
 function applyModuleOrder() {
@@ -361,11 +414,38 @@ function applyModuleOrder() {
   state.moduleOrder.forEach((id) => {
     if (modules.has(id)) els.sortableModules.append(modules.get(id));
   });
+  requestAnimationFrame(refreshMasonryLayout);
 }
 
 function saveModuleOrder() {
   state.moduleOrder = [...els.sortableModules.querySelectorAll(":scope > [data-module-id]")]
     .map((module) => module.dataset.moduleId);
+  persist();
+}
+
+function applyModuleSizes() {
+  if (!els.sortableModules) return;
+  state.moduleSizes = normalizeModuleSizes(state.moduleSizes);
+  for (const module of els.sortableModules.querySelectorAll(":scope > [data-module-id]")) {
+    const size = state.moduleSizes[module.dataset.moduleId];
+    module.dataset.moduleSize = size;
+    const button = module.querySelector(":scope > .panel-title .module-size-toggle");
+    if (!button) continue;
+    const willExpand = size === "half";
+    button.innerHTML = willExpand
+      ? '<span aria-hidden="true">&#x2922;</span>'
+      : '<span aria-hidden="true">&#x2921;</span>';
+    button.title = willExpand ? "Usar largura inteira" : "Usar meia largura";
+    button.setAttribute("aria-label", button.title);
+  }
+}
+
+function toggleModuleSize(moduleId) {
+  if (!DEFAULT_MODULE_ORDER.includes(moduleId)) return;
+  state.moduleSizes = normalizeModuleSizes(state.moduleSizes);
+  state.moduleSizes[moduleId] = state.moduleSizes[moduleId] === "full" ? "half" : "full";
+  applyModuleSizes();
+  requestAnimationFrame(refreshMasonryLayout);
   persist();
 }
 
@@ -866,6 +946,7 @@ function loadState(storageKey = activeStorageKey) {
       exchangeCustomEnd: null,
       exchangeHistory: null,
       moduleOrder: [...DEFAULT_MODULE_ORDER],
+      moduleSizes: { ...DEFAULT_MODULE_SIZES },
     };
   }
 
@@ -888,6 +969,7 @@ function loadState(storageKey = activeStorageKey) {
       exchangeCustomEnd: typeof parsed.exchangeCustomEnd === "string" ? parsed.exchangeCustomEnd : null,
       exchangeHistory: parsed.exchangeHistory && typeof parsed.exchangeHistory === "object" ? parsed.exchangeHistory : null,
       moduleOrder: normalizeModuleOrder(parsed.moduleOrder),
+      moduleSizes: normalizeModuleSizes(parsed.moduleSizes),
     };
   } catch {
     return {
@@ -907,6 +989,7 @@ function loadState(storageKey = activeStorageKey) {
       exchangeCustomEnd: null,
       exchangeHistory: null,
       moduleOrder: [...DEFAULT_MODULE_ORDER],
+      moduleSizes: { ...DEFAULT_MODULE_SIZES },
     };
   }
 }
@@ -1195,6 +1278,7 @@ function applyRemoteState(remote) {
   state.exchangeCustomEnd = typeof remote.exchangeCustomEnd === "string" ? remote.exchangeCustomEnd : null;
   state.exchangeHistory = remote.exchangeHistory && typeof remote.exchangeHistory === "object" ? remote.exchangeHistory : null;
   state.moduleOrder = normalizeModuleOrder(remote.moduleOrder);
+  state.moduleSizes = normalizeModuleSizes(remote.moduleSizes);
 
   saveLocalState();
   fillSelect(els.incomeSource, state.incomeSources);
@@ -1218,6 +1302,7 @@ function applyRemoteState(remote) {
   document.body.classList.toggle("dark", state.theme === "dark");
   updateThemeButton();
   applyModuleOrder();
+  applyModuleSizes();
   applyStaticTranslations();
   fillYearFilter(new Date().getFullYear());
   render();
