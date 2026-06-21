@@ -16,7 +16,7 @@ const MONTHS = [
 const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 const STATIC_TRANSLATIONS = {
-  "Mês": "Month", "Ano": "Year", "Idioma": "Language", "Entrar e sincronizar": "Sign in and sync",
+  "Mês": "Month", "Ano": "Year", "Idioma": "Language", "Moeda-base": "Base currency", "Moeda": "Currency", "Entrar e sincronizar": "Sign in and sync",
   "Tema escuro": "Dark theme", "Exportar CSV": "Export CSV", "Restaurar": "Restore", "Limpar Planilha": "Clear Spreadsheet",
   "Saldo inicial": "Starting balance", "Receitas": "Income", "Despesas": "Expenses", "Resultado": "Result",
   "Saldo final": "Final balance", "Lançamentos": "Entries", "Ganhos e gastos": "Income and expenses",
@@ -81,11 +81,13 @@ let authSession = loadAuthSession();
 let syncTimer;
 let syncInProgress = false;
 let authReady = false;
+let conversionRequestId = 0;
 
 const els = {
   monthFilter: document.querySelector("#monthFilter"),
   yearFilter: document.querySelector("#yearFilter"),
   languageSelect: document.querySelector("#languageSelect"),
+  baseCurrency: document.querySelector("#baseCurrency"),
   controlYearLabel: document.querySelector("#controlYearLabel"),
   ownerName: document.querySelector("#ownerName"),
   ownerNameHeading: document.querySelector("#ownerNameHeading"),
@@ -133,7 +135,9 @@ const els = {
   category: document.querySelector("#category"),
   payment: document.querySelector("#payment"),
   account: document.querySelector("#account"),
+  currency: document.querySelector("#currency"),
   amount: document.querySelector("#amount"),
+  conversionPreview: document.querySelector("#conversionPreview"),
   notes: document.querySelector("#notes"),
   incomeSourceChart: document.querySelector("#incomeSourceChart"),
   incomeSourcesPanel: document.querySelector("#incomeSourcesPanel"),
@@ -178,6 +182,9 @@ function entry(date, referenceMonth, type, incomeSource, description, category, 
     payment,
     account,
     amount,
+    currency: "BRL",
+    rates: null,
+    rateDate: null,
     notes,
   };
 }
@@ -185,6 +192,8 @@ function entry(date, referenceMonth, type, incomeSource, description, category, 
 function init() {
   prepareStaticTranslations();
   els.languageSelect.value = state.language;
+  els.baseCurrency.value = state.baseCurrency;
+  els.currency.value = state.baseCurrency;
   fillSelect(els.monthFilter, displayMonths().map((name, index) => ({ label: name, value: index })));
   fillYearFilter(new Date().getFullYear());
   fillSelect(els.referenceMonth, displayMonths().map((name, index) => ({ label: name, value: index })));
@@ -211,15 +220,20 @@ function init() {
   render();
   applyStaticTranslations();
   initializeAuth();
+  initializeExchangeRates();
 }
 
 function bindEvents() {
   els.monthFilter.addEventListener("change", render);
   els.yearFilter.addEventListener("change", render);
   els.languageSelect.addEventListener("change", changeLanguage);
+  els.baseCurrency.addEventListener("change", changeBaseCurrency);
   els.ownerName.addEventListener("input", updateOwnerName);
   els.searchInput.addEventListener("input", renderTable);
   els.type.addEventListener("change", updateCategoryOptions);
+  els.currency.addEventListener("change", updateConversionPreview);
+  els.amount.addEventListener("input", updateConversionPreview);
+  els.date.addEventListener("change", updateConversionPreview);
   els.entryForm.addEventListener("submit", saveEntry);
   els.cancelEdit.addEventListener("click", clearForm);
   els.incomeSourceForm.addEventListener("submit", addGeneralRegistrationItem);
@@ -290,6 +304,8 @@ function loadState() {
       ownerName: DEFAULT_OWNER_NAME,
       theme: "light",
       language: "pt",
+      baseCurrency: "EUR",
+      exchangeRatesCache: {},
     };
   }
 
@@ -303,6 +319,8 @@ function loadState() {
       ownerName: typeof parsed.ownerName === "string" && parsed.ownerName.trim() ? parsed.ownerName : DEFAULT_OWNER_NAME,
       theme: parsed.theme === "dark" ? "dark" : "light",
       language: parsed.language === "en" ? "en" : "pt",
+      baseCurrency: ["EUR", "BRL", "USD"].includes(parsed.baseCurrency) ? parsed.baseCurrency : "EUR",
+      exchangeRatesCache: parsed.exchangeRatesCache && typeof parsed.exchangeRatesCache === "object" ? parsed.exchangeRatesCache : {},
     };
   } catch {
     return {
@@ -313,6 +331,8 @@ function loadState() {
       ownerName: DEFAULT_OWNER_NAME,
       theme: "light",
       language: "pt",
+      baseCurrency: "EUR",
+      exchangeRatesCache: {},
     };
   }
 }
@@ -562,11 +582,14 @@ function applyRemoteState(remote) {
   state.ownerName = typeof remote.ownerName === "string" && remote.ownerName.trim() ? remote.ownerName : DEFAULT_OWNER_NAME;
   state.theme = remote.theme === "dark" ? "dark" : "light";
   state.language = remote.language === "en" ? "en" : state.language || "pt";
+  state.baseCurrency = ["EUR", "BRL", "USD"].includes(remote.baseCurrency) ? remote.baseCurrency : state.baseCurrency || "EUR";
+  state.exchangeRatesCache = remote.exchangeRatesCache && typeof remote.exchangeRatesCache === "object" ? remote.exchangeRatesCache : state.exchangeRatesCache || {};
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   fillSelect(els.incomeSource, state.incomeSources);
   fillSelect(els.account, state.accounts);
   els.languageSelect.value = state.language;
+  els.baseCurrency.value = state.baseCurrency;
   const selectedMonthValue = els.monthFilter.value;
   const referenceMonthValue = els.referenceMonth.value;
   fillSelect(els.monthFilter, displayMonths().map((name, index) => ({ label: name, value: index })));
@@ -668,6 +691,90 @@ function changeLanguage() {
   persist();
 }
 
+function changeBaseCurrency() {
+  state.baseCurrency = els.baseCurrency.value;
+  render();
+  updateConversionPreview();
+  persist();
+}
+
+async function fetchExchangeRates(date = "latest") {
+  const response = await fetch(`https://api.frankfurter.app/${date}?from=EUR&to=BRL,USD`);
+  if (!response.ok) throw new Error("Cotação indisponível");
+  const data = await response.json();
+  const rates = { EUR: 1, BRL: Number(data.rates?.BRL), USD: Number(data.rates?.USD) };
+  if (!rates.BRL || !rates.USD) throw new Error("Cotação incompleta");
+  return { rates, rateDate: data.date || date };
+}
+
+async function getRatesForDate(date) {
+  const cacheKey = date || "latest";
+  if (state.exchangeRatesCache[cacheKey]) return state.exchangeRatesCache[cacheKey];
+
+  try {
+    const result = await fetchExchangeRates(cacheKey);
+    state.exchangeRatesCache[cacheKey] = result;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return result;
+  } catch {
+    const cached = state.exchangeRatesCache.latest || Object.values(state.exchangeRatesCache).at(-1);
+    if (cached) return { ...cached, fallback: true };
+    return null;
+  }
+}
+
+async function initializeExchangeRates() {
+  await getRatesForDate("latest");
+  const dates = [...new Set(state.entries.filter((item) => !item.rates).map((item) => item.date).filter(Boolean))];
+  await Promise.all(dates.map((date) => getRatesForDate(date)));
+  render();
+  updateConversionPreview();
+}
+
+function ratesForEntry(item) {
+  return item.rates || state.exchangeRatesCache[item.date]?.rates || state.exchangeRatesCache.latest?.rates || null;
+}
+
+function convertCurrency(amount, sourceCurrency, targetCurrency, rates) {
+  const numericAmount = Number(amount || 0);
+  if (sourceCurrency === targetCurrency) return numericAmount;
+  if (!rates?.[sourceCurrency] || !rates?.[targetCurrency]) return numericAmount;
+  return (numericAmount / rates[sourceCurrency]) * rates[targetCurrency];
+}
+
+function entryValue(item, targetCurrency = state.baseCurrency) {
+  return convertCurrency(item.amount, item.currency || "BRL", targetCurrency, ratesForEntry(item));
+}
+
+async function updateConversionPreview() {
+  const requestId = ++conversionRequestId;
+  const amount = Number(els.amount.value || 0);
+  const sourceCurrency = els.currency.value;
+  const targetCurrency = state.baseCurrency;
+
+  if (!amount) {
+    els.conversionPreview.textContent = ui("Informe o valor para visualizar a conversão.", "Enter an amount to preview the conversion.");
+    return;
+  }
+
+  if (sourceCurrency === targetCurrency) {
+    els.conversionPreview.innerHTML = `<strong>${money(amount, sourceCurrency)}</strong> · ${ui("sem conversão", "no conversion")}`;
+    return;
+  }
+
+  els.conversionPreview.textContent = ui("Buscando cotação...", "Fetching exchange rate...");
+  const result = await getRatesForDate(els.date.value);
+  if (requestId !== conversionRequestId) return;
+  if (!result) {
+    els.conversionPreview.textContent = ui("Cotação indisponível. Verifique a conexão.", "Rate unavailable. Check your connection.");
+    return;
+  }
+
+  const converted = convertCurrency(amount, sourceCurrency, targetCurrency, result.rates);
+  const fallback = result.fallback ? ` · ${ui("última cotação salva", "last saved rate")}` : ` · ${ui("cotação de", "rate from")} ${formatDate(result.rateDate)}`;
+  els.conversionPreview.innerHTML = `<strong>${money(amount, sourceCurrency)} = ${money(converted, targetCurrency)}</strong>${fallback}`;
+}
+
 function currentCategoryOptions() {
   if (!state.categories || typeof state.categories !== "object") {
     state.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
@@ -753,16 +860,17 @@ function calculateStartingBalance(month, year) {
     const itemYear = entryYear(item);
     const itemMonth = Number(item.referenceMonth);
     if (itemYear > year || (itemYear === year && itemMonth >= month)) return total;
-    return total + (item.type === "Receita" ? item.amount : -item.amount);
+    const value = entryValue(item);
+    return total + (item.type === "Receita" ? value : -value);
   }, 0);
 }
 
 function sum(entries) {
-  return entries.reduce((total, item) => total + Number(item.amount || 0), 0);
+  return entries.reduce((total, item) => total + entryValue(item), 0);
 }
 
-function money(value) {
-  return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+function money(value, currency = state.baseCurrency) {
+  return Number(value || 0).toLocaleString(state.language === "en" ? "en-IE" : "pt-BR", { style: "currency", currency });
 }
 
 function renderCashflow(income, expense, balance) {
@@ -817,7 +925,7 @@ function renderMonthlyChart() {
 function groupValues(entries, key) {
   return entries.reduce((groups, item) => {
     const label = item[key] || ui("Sem informação", "No information");
-    groups[label] = (groups[label] || 0) + Number(item.amount || 0);
+    groups[label] = (groups[label] || 0) + entryValue(item);
     return groups;
   }, {});
 }
@@ -827,7 +935,8 @@ function accountBalances() {
     const itemYear = entryYear(item);
     const itemMonth = Number(item.referenceMonth);
     if (itemYear > selectedYear() || (itemYear === selectedYear() && itemMonth > selectedMonth())) return groups;
-    groups[item.account] = (groups[item.account] || 0) + (item.type === "Receita" ? item.amount : -item.amount);
+    const value = entryValue(item);
+    groups[item.account] = (groups[item.account] || 0) + (item.type === "Receita" ? value : -value);
     return groups;
   }, {});
 }
@@ -883,7 +992,10 @@ function renderTable() {
           <td>${escapeHtml(item.category)}</td>
           <td>${escapeHtml(item.payment)}</td>
           <td>${escapeHtml(item.account)}</td>
-          <td><strong>${money(item.amount)}</strong></td>
+          <td>
+            <strong>${money(item.amount, item.currency || "BRL")}</strong>
+            ${(item.currency || "BRL") !== state.baseCurrency ? `<br><small>≈ ${money(entryValue(item))}</small>` : ""}
+          </td>
           <td>
             <div class="row-actions">
               <button type="button" data-action="edit" data-id="${item.id}">${ui("Editar", "Edit")}</button>
@@ -896,8 +1008,13 @@ function renderTable() {
     .join("");
 }
 
-function saveEntry(event) {
+async function saveEntry(event) {
   event.preventDefault();
+  const rateResult = await getRatesForDate(els.date.value);
+  if (els.currency.value !== state.baseCurrency && !rateResult) {
+    alert(ui("Não foi possível obter a cotação. Conecte-se à internet e tente novamente.", "Could not obtain the exchange rate. Connect to the internet and try again."));
+    return;
+  }
   const data = {
     id: els.editingId.value || crypto.randomUUID(),
     date: els.date.value,
@@ -909,6 +1026,9 @@ function saveEntry(event) {
     payment: els.payment.value,
     account: els.account.value,
     amount: Number(els.amount.value),
+    currency: els.currency.value,
+    rates: rateResult?.rates || null,
+    rateDate: rateResult?.rateDate || els.date.value,
     notes: els.notes.value.trim(),
   };
 
@@ -933,7 +1053,9 @@ function clearForm() {
   els.cancelEdit.classList.add("hidden");
   els.date.value = defaultDateForSelection();
   els.referenceMonth.value = els.monthFilter.value;
+  els.currency.value = state.baseCurrency;
   updateCategoryOptions();
+  updateConversionPreview();
 }
 
 function editEntry(id) {
@@ -952,11 +1074,13 @@ function editEntry(id) {
   els.category.value = item.category;
   els.payment.value = item.payment;
   els.account.value = item.account;
+  els.currency.value = item.currency || "BRL";
   els.amount.value = item.amount;
   els.notes.value = item.notes || "";
   els.cancelEdit.classList.remove("hidden");
   activeRegistrationTab = "entry";
   renderRegistrationTabs();
+  updateConversionPreview();
   els.entryForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -1131,8 +1255,8 @@ function renderGeneralRegistrations() {
 
 function exportCsv() {
   const headers = state.language === "en"
-    ? ["Date", "Reference", "Type", "Source", "Description", "Category", "Method", "Account", "Amount", "Notes"]
-    : ["Data", "Referente", "Tipo", "Origem", "Descrição", "Categoria", "Forma", "Conta", "Valor", "Observações"];
+    ? ["Date", "Reference", "Type", "Source", "Description", "Category", "Method", "Account", "Original amount", "Currency", `Amount in ${state.baseCurrency}`, "Notes"]
+    : ["Data", "Referente", "Tipo", "Origem", "Descrição", "Categoria", "Forma", "Conta", "Valor original", "Moeda", `Valor em ${state.baseCurrency}`, "Observações"];
   const rows = state.entries.map((item) => [
     item.date,
     displayMonths()[item.referenceMonth],
@@ -1143,6 +1267,8 @@ function exportCsv() {
     item.payment,
     item.account,
     item.amount.toFixed(2).replace(".", ","),
+    item.currency || "BRL",
+    entryValue(item).toFixed(2).replace(".", ","),
     item.notes || "",
   ]);
   const csv = [headers, ...rows].map((row) => row.map(csvValue).join(";")).join("\n");
