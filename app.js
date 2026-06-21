@@ -699,7 +699,7 @@ function changeBaseCurrency() {
 }
 
 async function fetchExchangeRates(date = "latest") {
-  const response = await fetch(`https://api.frankfurter.app/${date}?from=EUR&to=BRL,USD`);
+  const response = await fetch(`https://api.frankfurter.dev/v1/${date}?from=EUR&to=BRL,USD`);
   if (!response.ok) throw new Error("Cotação indisponível");
   const data = await response.json();
   const rates = { EUR: 1, BRL: Number(data.rates?.BRL), USD: Number(data.rates?.USD) };
@@ -738,12 +738,12 @@ function ratesForEntry(item) {
 function convertCurrency(amount, sourceCurrency, targetCurrency, rates) {
   const numericAmount = Number(amount || 0);
   if (sourceCurrency === targetCurrency) return numericAmount;
-  if (!rates?.[sourceCurrency] || !rates?.[targetCurrency]) return numericAmount;
+  if (!rates?.[sourceCurrency] || !rates?.[targetCurrency]) return null;
   return (numericAmount / rates[sourceCurrency]) * rates[targetCurrency];
 }
 
 function entryValue(item, targetCurrency = state.baseCurrency) {
-  return convertCurrency(item.amount, item.currency || "BRL", targetCurrency, ratesForEntry(item));
+  return convertCurrency(item.amount, item.currency || "BRL", targetCurrency, ratesForEntry(item)) ?? 0;
 }
 
 async function updateConversionPreview() {
@@ -771,6 +771,10 @@ async function updateConversionPreview() {
   }
 
   const converted = convertCurrency(amount, sourceCurrency, targetCurrency, result.rates);
+  if (converted === null) {
+    els.conversionPreview.textContent = ui("Cotação incompleta. Tente atualizar novamente.", "Incomplete rate. Please try updating again.");
+    return;
+  }
   const fallback = result.fallback ? ` · ${ui("última cotação salva", "last saved rate")}` : ` · ${ui("cotação de", "rate from")} ${formatDate(result.rateDate)}`;
   els.conversionPreview.innerHTML = `<strong>${money(amount, sourceCurrency)} = ${money(converted, targetCurrency)}</strong>${fallback}`;
 }
@@ -994,7 +998,11 @@ function renderTable() {
           <td>${escapeHtml(item.account)}</td>
           <td>
             <strong>${money(item.amount, item.currency || "BRL")}</strong>
-            ${(item.currency || "BRL") !== state.baseCurrency ? `<br><small>≈ ${money(entryValue(item))}</small>` : ""}
+            ${(item.currency || "BRL") !== state.baseCurrency
+              ? ratesForEntry(item)
+                ? `<br><small>≈ ${money(entryValue(item))}</small>`
+                : `<br><small>${ui("Cotação pendente", "Rate pending")}</small>`
+              : ""}
           </td>
           <td>
             <div class="row-actions">
