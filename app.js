@@ -73,6 +73,7 @@ const DEFAULT_INCOME_SOURCES = ["Lurdes", "Camargo", "Família", "Banco", "Outro
 const DEFAULT_ACCOUNTS = ["Carteira", "Conta corrente", "Poupança", "Cartão", "Investimentos"];
 const DEFAULT_OWNER_NAME = "Lurdes Camargo";
 const NEW_USER_OWNER_NAME = "Minha Planilha";
+const DEFAULT_MODULE_ORDER = ["dashboard", "registrations", "analysis", "exchange", "history"];
 const STORAGE_KEY = "lurdes-controle-financeiro-v1";
 const AUTH_STORAGE_KEY = "controle-financeiro-auth-v1";
 const SUPABASE_URL = "https://uxioksvzpcogcuplfrdj.supabase.co";
@@ -113,6 +114,7 @@ let tesseractLoader = null;
 let pdfJsLoader = null;
 
 const els = {
+  sortableModules: null,
   monthFilter: document.querySelector("#monthFilter"),
   yearFilter: document.querySelector("#yearFilter"),
   languageSelect: document.querySelector("#languageSelect"),
@@ -248,6 +250,7 @@ function entry(date, referenceMonth, type, incomeSource, description, category, 
 }
 
 function init() {
+  initializeModuleLayout();
   prepareStaticTranslations();
   els.languageSelect.value = state.language;
   els.baseCurrency.value = state.baseCurrency;
@@ -282,6 +285,88 @@ function init() {
   applyStaticTranslations();
   initializeAuth();
   initializeExchangeRates();
+}
+
+function normalizeModuleOrder(order) {
+  const unique = [];
+  for (const id of Array.isArray(order) ? order : []) {
+    if (DEFAULT_MODULE_ORDER.includes(id) && !unique.includes(id)) unique.push(id);
+  }
+  return [...unique, ...DEFAULT_MODULE_ORDER.filter((id) => !unique.includes(id))];
+}
+
+function initializeModuleLayout() {
+  const moduleDefinitions = [
+    ["dashboard", document.querySelector(".dashboard-panel")],
+    ["registrations", document.querySelector(".registrations-panel")],
+    ["analysis", document.querySelector(".charts-panel")],
+    ["exchange", document.querySelector(".exchange-rate-panel")],
+    ["history", document.querySelector(".history-panel")],
+  ];
+  const firstModule = moduleDefinitions[0][1];
+  if (!firstModule) return;
+
+  const container = document.createElement("section");
+  container.id = "sortableModules";
+  container.className = "sortable-modules";
+  firstModule.before(container);
+  els.sortableModules = container;
+
+  for (const [id, module] of moduleDefinitions) {
+    if (!module) continue;
+    module.dataset.moduleId = id;
+    addModuleDragHandle(module);
+    container.append(module);
+  }
+
+  document.querySelector(".workspace")?.remove();
+  applyModuleOrder();
+
+  if (!window.Sortable) return;
+  window.Sortable.create(container, {
+    animation: 180,
+    handle: ".module-drag-handle",
+    draggable: "[data-module-id]",
+    ghostClass: "module-sort-ghost",
+    chosenClass: "module-sort-chosen",
+    dragClass: "module-sort-drag",
+    forceFallback: true,
+    fallbackOnBody: true,
+    swapThreshold: 0.65,
+    onEnd: saveModuleOrder,
+  });
+}
+
+function addModuleDragHandle(module) {
+  const title = module.querySelector(":scope > .panel-title");
+  const heading = title?.querySelector(":scope > h2");
+  if (!title || !heading) return;
+
+  const headingGroup = document.createElement("div");
+  headingGroup.className = "module-heading";
+  const handle = document.createElement("button");
+  handle.className = "module-drag-handle";
+  handle.type = "button";
+  handle.setAttribute("aria-label", `Mover ${heading.textContent.trim()}`);
+  handle.title = "Arrastar para reorganizar";
+  handle.innerHTML = '<span aria-hidden="true">&#8942;&#8942;</span>';
+  title.insertBefore(headingGroup, heading);
+  headingGroup.append(handle, heading);
+}
+
+function applyModuleOrder() {
+  if (!els.sortableModules) return;
+  state.moduleOrder = normalizeModuleOrder(state.moduleOrder);
+  const modules = new Map([...els.sortableModules.children].map((module) => [module.dataset.moduleId, module]));
+  state.moduleOrder.forEach((id) => {
+    if (modules.has(id)) els.sortableModules.append(modules.get(id));
+  });
+}
+
+function saveModuleOrder() {
+  state.moduleOrder = [...els.sortableModules.querySelectorAll(":scope > [data-module-id]")]
+    .map((module) => module.dataset.moduleId);
+  persist();
 }
 
 function bindEvents() {
@@ -780,6 +865,7 @@ function loadState(storageKey = activeStorageKey) {
       exchangeCustomStart: null,
       exchangeCustomEnd: null,
       exchangeHistory: null,
+      moduleOrder: [...DEFAULT_MODULE_ORDER],
     };
   }
 
@@ -801,6 +887,7 @@ function loadState(storageKey = activeStorageKey) {
       exchangeCustomStart: typeof parsed.exchangeCustomStart === "string" ? parsed.exchangeCustomStart : null,
       exchangeCustomEnd: typeof parsed.exchangeCustomEnd === "string" ? parsed.exchangeCustomEnd : null,
       exchangeHistory: parsed.exchangeHistory && typeof parsed.exchangeHistory === "object" ? parsed.exchangeHistory : null,
+      moduleOrder: normalizeModuleOrder(parsed.moduleOrder),
     };
   } catch {
     return {
@@ -819,6 +906,7 @@ function loadState(storageKey = activeStorageKey) {
       exchangeCustomStart: null,
       exchangeCustomEnd: null,
       exchangeHistory: null,
+      moduleOrder: [...DEFAULT_MODULE_ORDER],
     };
   }
 }
@@ -1106,6 +1194,7 @@ function applyRemoteState(remote) {
   state.exchangeCustomStart = typeof remote.exchangeCustomStart === "string" ? remote.exchangeCustomStart : null;
   state.exchangeCustomEnd = typeof remote.exchangeCustomEnd === "string" ? remote.exchangeCustomEnd : null;
   state.exchangeHistory = remote.exchangeHistory && typeof remote.exchangeHistory === "object" ? remote.exchangeHistory : null;
+  state.moduleOrder = normalizeModuleOrder(remote.moduleOrder);
 
   saveLocalState();
   fillSelect(els.incomeSource, state.incomeSources);
@@ -1128,6 +1217,7 @@ function applyRemoteState(remote) {
   document.title = "Planilha de Controle Financeiro";
   document.body.classList.toggle("dark", state.theme === "dark");
   updateThemeButton();
+  applyModuleOrder();
   applyStaticTranslations();
   fillYearFilter(new Date().getFullYear());
   render();

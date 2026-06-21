@@ -580,6 +580,83 @@ select:focus {
   margin-bottom: 20px;
 }
 
+.sortable-modules {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  align-items: start;
+  gap: 24px 20px;
+  width: 100%;
+}
+
+.sortable-modules > .panel {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+}
+
+.sortable-modules > [data-module-id="dashboard"],
+.sortable-modules > [data-module-id="exchange"],
+.sortable-modules > [data-module-id="history"] {
+  grid-column: 1 / -1;
+}
+
+.module-heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+}
+
+.module-drag-handle {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.module-drag-handle span {
+  font-size: 1.2rem;
+  line-height: 1;
+  letter-spacing: 2px;
+}
+
+.module-drag-handle:hover,
+.module-drag-handle:focus-visible {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+  color: var(--primary);
+  outline: none;
+}
+
+.module-drag-handle:active {
+  cursor: grabbing;
+  transform: scale(0.96);
+}
+
+.module-sort-ghost {
+  opacity: 0.3;
+  border: 1px dashed var(--primary);
+}
+
+.module-sort-chosen {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--line));
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.module-sort-drag {
+  opacity: 0.96;
+}
+
 .dashboard-panel {
   margin-bottom: 24px;
 }
@@ -1681,6 +1758,14 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 1180px) {
+  .sortable-modules {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sortable-modules > .panel {
+    grid-column: 1;
+  }
+
   .summary-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
