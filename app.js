@@ -62,6 +62,7 @@ const DEFAULT_PAYMENTS = ["Pix", "Débito", "Crédito", "Dinheiro", "Boleto", "T
 const DEFAULT_INCOME_SOURCES = ["Lurdes", "Camargo", "Família", "Banco", "Outro", "Não se aplica"];
 const DEFAULT_ACCOUNTS = ["Carteira", "Conta corrente", "Poupança", "Cartão", "Investimentos"];
 const DEFAULT_OWNER_NAME = "Lurdes Camargo";
+const NEW_USER_OWNER_NAME = "Minha Planilha";
 const STORAGE_KEY = "lurdes-controle-financeiro-v1";
 const AUTH_STORAGE_KEY = "controle-financeiro-auth-v1";
 const SUPABASE_URL = "https://uxioksvzpcogcuplfrdj.supabase.co";
@@ -78,12 +79,13 @@ const sampleEntries = [
   entry("2026-04-16", 3, "Despesa", "Não se aplica", "Mercado", "Mercado", "Débito", "Conta corrente", 468.8, ""),
 ];
 
-const state = loadState();
+let authSession = loadAuthSession();
+let activeStorageKey = authSession?.user?.id ? accountStorageKey(authSession.user.id) : STORAGE_KEY;
+const state = loadState(activeStorageKey);
 let activeHistoryFilter = "all";
 let activeVisualTab = "overview";
 let activeRegistrationTab = "entry";
 let activeSubRegistrationTab = "incomeSources";
-let authSession = loadAuthSession();
 let syncTimer;
 let syncInProgress = false;
 let authReady = false;
@@ -345,16 +347,21 @@ function bindEvents() {
   });
 }
 
-function loadState() {
-  const saved = localStorage.getItem(STORAGE_KEY);
+function accountStorageKey(userId) {
+  return `${STORAGE_KEY}:user:${userId}`;
+}
+
+function loadState(storageKey = activeStorageKey) {
+  const saved = localStorage.getItem(storageKey);
+  const isAccountStorage = storageKey !== STORAGE_KEY;
   if (!saved) {
     return {
-      entries: sampleEntries,
+      entries: isAccountStorage ? [] : sampleEntries,
       accounts: DEFAULT_ACCOUNTS,
       payments: DEFAULT_PAYMENTS,
       incomeSources: DEFAULT_INCOME_SOURCES,
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
-      ownerName: DEFAULT_OWNER_NAME,
+      ownerName: isAccountStorage ? NEW_USER_OWNER_NAME : DEFAULT_OWNER_NAME,
       theme: "light",
       language: "pt",
       baseCurrency: "EUR",
@@ -375,7 +382,7 @@ function loadState() {
       payments: Array.isArray(parsed.payments) ? parsed.payments : DEFAULT_PAYMENTS,
       incomeSources: Array.isArray(parsed.incomeSources) ? normalizeIncomeSources(parsed.incomeSources) : DEFAULT_INCOME_SOURCES,
       categories: parsed.categories && typeof parsed.categories === "object" ? parsed.categories : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
-      ownerName: typeof parsed.ownerName === "string" && parsed.ownerName.trim() ? parsed.ownerName : DEFAULT_OWNER_NAME,
+      ownerName: typeof parsed.ownerName === "string" && parsed.ownerName.trim() ? parsed.ownerName : (isAccountStorage ? NEW_USER_OWNER_NAME : DEFAULT_OWNER_NAME),
       theme: parsed.theme === "dark" ? "dark" : "light",
       language: parsed.language === "en" ? "en" : "pt",
       baseCurrency: ["EUR", "BRL", "USD"].includes(parsed.baseCurrency) ? parsed.baseCurrency : "EUR",
@@ -388,12 +395,12 @@ function loadState() {
     };
   } catch {
     return {
-      entries: sampleEntries,
+      entries: isAccountStorage ? [] : sampleEntries,
       accounts: DEFAULT_ACCOUNTS,
       payments: DEFAULT_PAYMENTS,
       incomeSources: DEFAULT_INCOME_SOURCES,
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
-      ownerName: DEFAULT_OWNER_NAME,
+      ownerName: isAccountStorage ? NEW_USER_OWNER_NAME : DEFAULT_OWNER_NAME,
       theme: "light",
       language: "pt",
       baseCurrency: "EUR",
@@ -408,8 +415,26 @@ function loadState() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  saveLocalState();
   scheduleCloudSync();
+}
+
+function saveLocalState() {
+  localStorage.setItem(activeStorageKey, JSON.stringify(state));
+}
+
+function activateAccountStorage(userId) {
+  if (!userId) return;
+  activeStorageKey = accountStorageKey(userId);
+  applyRemoteState(loadState(activeStorageKey));
+  clearForm();
+}
+
+function activateGuestStorage() {
+  activeStorageKey = STORAGE_KEY;
+  localStorage.removeItem(STORAGE_KEY);
+  applyRemoteState(loadState(STORAGE_KEY));
+  clearForm();
 }
 
 function loadAuthSession() {
@@ -476,6 +501,7 @@ async function ensureSession() {
   if (authSession.expires_at > Math.floor(Date.now() / 1000) + 60 && authSession.user) return authSession;
   if (!authSession.refresh_token) {
     clearAuthSession();
+    activateGuestStorage();
     return null;
   }
 
@@ -489,6 +515,7 @@ async function ensureSession() {
     return authSession;
   } catch {
     clearAuthSession();
+    activateGuestStorage();
     return null;
   }
 }
@@ -498,7 +525,12 @@ async function initializeAuth() {
     await consumeAuthRedirect();
     const session = await ensureSession();
     updateAuthUi();
-    if (session) await loadRemoteState();
+    if (session?.user?.id) {
+      activateAccountStorage(session.user.id);
+      await loadRemoteState();
+    } else {
+      activateGuestStorage();
+    }
   } catch (error) {
     setSyncStatus("error", friendlyAuthError(error));
     updateAuthUi();
@@ -552,6 +584,8 @@ async function createAccount() {
 
     if (result.access_token) {
       saveAuthSession(result);
+      activateAccountStorage(result.user.id);
+      els.authPassword.value = "";
       updateAuthUi();
       await loadRemoteState();
       setAuthMessage("");
@@ -576,6 +610,8 @@ async function signIn(event) {
       body: { email: els.authEmail.value.trim(), password: els.authPassword.value },
     });
     saveAuthSession(session);
+    activateAccountStorage(session.user.id);
+    els.authPassword.value = "";
     updateAuthUi();
     await loadRemoteState();
     setAuthMessage("");
@@ -591,6 +627,7 @@ async function signOut() {
     // The local session is cleared even if the network is unavailable.
   }
   clearAuthSession();
+  activateGuestStorage();
   updateAuthUi();
   els.authDialog.close();
 }
@@ -650,18 +687,18 @@ function applyRemoteState(remote) {
   state.payments = Array.isArray(remote.payments) ? remote.payments : [...DEFAULT_PAYMENTS];
   state.incomeSources = Array.isArray(remote.incomeSources) ? normalizeIncomeSources(remote.incomeSources) : [...DEFAULT_INCOME_SOURCES];
   state.categories = remote.categories && typeof remote.categories === "object" ? remote.categories : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-  state.ownerName = typeof remote.ownerName === "string" && remote.ownerName.trim() ? remote.ownerName : DEFAULT_OWNER_NAME;
+  state.ownerName = typeof remote.ownerName === "string" && remote.ownerName.trim() ? remote.ownerName : NEW_USER_OWNER_NAME;
   state.theme = remote.theme === "dark" ? "dark" : "light";
-  state.language = remote.language === "en" ? "en" : state.language || "pt";
-  state.baseCurrency = ["EUR", "BRL", "USD"].includes(remote.baseCurrency) ? remote.baseCurrency : state.baseCurrency || "EUR";
-  state.exchangeRatesCache = remote.exchangeRatesCache && typeof remote.exchangeRatesCache === "object" ? remote.exchangeRatesCache : state.exchangeRatesCache || {};
-  state.exchangePair = typeof remote.exchangePair === "string" ? remote.exchangePair : state.exchangePair || "EUR/BRL";
-  state.exchangePeriod = ["1m", "3m", "6m", "1y", "custom"].includes(remote.exchangePeriod) ? remote.exchangePeriod : state.exchangePeriod || "1m";
-  state.exchangeCustomStart = typeof remote.exchangeCustomStart === "string" ? remote.exchangeCustomStart : state.exchangeCustomStart || null;
-  state.exchangeCustomEnd = typeof remote.exchangeCustomEnd === "string" ? remote.exchangeCustomEnd : state.exchangeCustomEnd || null;
-  state.exchangeHistory = remote.exchangeHistory && typeof remote.exchangeHistory === "object" ? remote.exchangeHistory : state.exchangeHistory || null;
+  state.language = remote.language === "en" ? "en" : "pt";
+  state.baseCurrency = ["EUR", "BRL", "USD"].includes(remote.baseCurrency) ? remote.baseCurrency : "EUR";
+  state.exchangeRatesCache = remote.exchangeRatesCache && typeof remote.exchangeRatesCache === "object" ? remote.exchangeRatesCache : {};
+  state.exchangePair = typeof remote.exchangePair === "string" ? remote.exchangePair : "EUR/BRL";
+  state.exchangePeriod = ["1m", "3m", "6m", "1y", "custom"].includes(remote.exchangePeriod) ? remote.exchangePeriod : "1m";
+  state.exchangeCustomStart = typeof remote.exchangeCustomStart === "string" ? remote.exchangeCustomStart : null;
+  state.exchangeCustomEnd = typeof remote.exchangeCustomEnd === "string" ? remote.exchangeCustomEnd : null;
+  state.exchangeHistory = remote.exchangeHistory && typeof remote.exchangeHistory === "object" ? remote.exchangeHistory : null;
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  saveLocalState();
   fillSelect(els.incomeSource, state.incomeSources);
   fillSelect(els.account, state.accounts);
   fillSelect(els.payment, state.payments);
@@ -794,7 +831,7 @@ async function getRatesForDate(date) {
   try {
     const result = await fetchExchangeRates(cacheKey);
     state.exchangeRatesCache[cacheKey] = result;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    saveLocalState();
     return result;
   } catch {
     const cached = state.exchangeRatesCache.latest || Object.values(state.exchangeRatesCache).at(-1);
@@ -904,7 +941,7 @@ async function loadExchangeHistory(force = false) {
     if (!response.ok) throw new Error("Histórico indisponível");
     const data = await response.json();
     state.exchangeHistory = { fetchedOn: todayKey, rangeKey, startDate, endDate, rates: data.rates || {} };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    saveLocalState();
   } catch {
     if (state.exchangeHistory?.rangeKey !== rangeKey) {
       els.exchangeCurrent.textContent = "—";
