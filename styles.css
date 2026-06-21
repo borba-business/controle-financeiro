@@ -194,10 +194,25 @@ body.utility-menu-open {
   gap: 5px;
 }
 
+.utility-menu-settings {
+  display: grid;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.utility-menu-settings .field,
+.utility-menu-settings select {
+  width: 100%;
+  min-width: 0;
+}
+
 .utility-menu-actions {
   display: grid;
   gap: 8px;
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .utility-action {

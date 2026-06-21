@@ -17,7 +17,7 @@ const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July
 
 const STATIC_TRANSLATIONS = {
   "Mês": "Month", "Ano": "Year", "Idioma": "Language", "Moeda-base": "Base currency", "Moeda": "Currency", "Entrar e sincronizar": "Sign in and sync",
-  "Tema escuro": "Dark theme", "Exportar CSV": "Export CSV", "Restaurar": "Restore", "Limpar Planilha": "Clear Spreadsheet",
+  "Tema escuro": "Dark theme", "Exportar CSV": "Export CSV", "Limpar Planilha": "Clear Spreadsheet",
   "Saldo inicial": "Starting balance", "Receitas": "Income", "Despesas": "Expenses", "Resultado": "Result",
   "Saldo final": "Final balance", "Lançamentos": "Entries", "Ganhos e gastos": "Income and expenses",
   "Comparativo do período": "Period comparison", "Visão mês a mês": "Month-by-month view", "Cadastros": "Records",
@@ -91,17 +91,6 @@ const TESSERACT_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/di
 const PDFJS_MODULE_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs";
 const PDFJS_WORKER_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
 
-const sampleEntries = [
-  entry("2026-06-01", 5, "Receita", "Aposentadoria", "Aposentadoria", "Aposentadoria", "Transferência", "Conta corrente", 4200, "Recebimento mensal"),
-  entry("2026-06-03", 5, "Despesa", "Não se aplica", "Mercado", "Mercado", "Débito", "Conta corrente", 536.9, ""),
-  entry("2026-06-07", 5, "Despesa", "Não se aplica", "UNIMED", "Saúde", "Boleto", "Conta corrente", 890, ""),
-  entry("2026-06-10", 5, "Despesa", "Não se aplica", "Farmácia", "Saúde", "Pix", "Conta corrente", 148.35, ""),
-  entry("2026-05-01", 4, "Receita", "Aposentadoria", "Aposentadoria", "Aposentadoria", "Transferência", "Conta corrente", 4200, ""),
-  entry("2026-05-12", 4, "Despesa", "Não se aplica", "IPVA", "Impostos", "Boleto", "Conta corrente", 612.44, ""),
-  entry("2026-04-01", 3, "Receita", "Aluguel", "Aluguel", "Aluguel", "Pix", "Poupança", 1550, ""),
-  entry("2026-04-16", 3, "Despesa", "Não se aplica", "Mercado", "Mercado", "Débito", "Conta corrente", 468.8, ""),
-];
-
 let authSession = loadAuthSession();
 let activeStorageKey = authSession?.user?.id ? accountStorageKey(authSession.user.id) : STORAGE_KEY;
 const state = loadState(activeStorageKey);
@@ -135,7 +124,6 @@ const els = {
   ownerNameHeading: document.querySelector("#ownerNameHeading"),
   themeToggle: document.querySelector("#themeToggle"),
   exportCsv: document.querySelector("#exportCsv"),
-  resetData: document.querySelector("#resetData"),
   clearData: document.querySelector("#clearData"),
   utilityMenuToggle: document.querySelector("#utilityMenuToggle"),
   utilityMenu: document.querySelector("#utilityMenu"),
@@ -244,25 +232,6 @@ function registerServiceWorker() {
   navigator.serviceWorker.register("./service-worker.js").catch(() => {
     // The app remains fully usable when offline installation is unavailable.
   });
-}
-
-function entry(date, referenceMonth, type, incomeSource, description, category, payment, account, amount, notes) {
-  return {
-    id: crypto.randomUUID(),
-    date,
-    referenceMonth,
-    type,
-    incomeSource,
-    description,
-    category,
-    payment,
-    account,
-    amount,
-    currency: "BRL",
-    rates: null,
-    rateDate: null,
-    notes,
-  };
 }
 
 function init() {
@@ -509,14 +478,12 @@ function bindEvents() {
   els.incomeSourcesList.addEventListener("click", removeGeneralRegistrationItem);
   els.themeToggle.addEventListener("click", toggleTheme);
   els.exportCsv.addEventListener("click", exportCsv);
-  els.resetData.addEventListener("click", resetData);
   els.clearData.addEventListener("click", clearData);
   els.utilityMenuToggle.addEventListener("click", openUtilityMenu);
   els.utilityMenuClose.addEventListener("click", closeUtilityMenu);
   els.utilityMenuBackdrop.addEventListener("click", closeUtilityMenu);
   els.openBackupPanel.addEventListener("click", openBackupFromUtilityMenu);
   els.exportCsv.addEventListener("click", closeUtilityMenu);
-  els.resetData.addEventListener("click", closeUtilityMenu);
   els.clearData.addEventListener("click", closeUtilityMenu);
   document.addEventListener("keydown", handleUtilityMenuKeydown);
   els.cancelClearData.addEventListener("click", closeClearDataDialog);
@@ -978,7 +945,7 @@ function loadState(storageKey = activeStorageKey) {
   try {
     const parsed = JSON.parse(saved);
     return {
-      entries: Array.isArray(parsed.entries) ? parsed.entries : sampleEntries,
+      entries: Array.isArray(parsed.entries) ? parsed.entries : [],
       accounts: Array.isArray(parsed.accounts) ? parsed.accounts : DEFAULT_ACCOUNTS,
       payments: Array.isArray(parsed.payments) ? parsed.payments : DEFAULT_PAYMENTS,
       incomeSources: Array.isArray(parsed.incomeSources) ? normalizeIncomeSources(parsed.incomeSources) : DEFAULT_INCOME_SOURCES,
@@ -2586,23 +2553,6 @@ async function restoreBackup(event) {
   } finally {
     event.target.value = "";
   }
-}
-
-function resetData() {
-  if (!confirm("Restaurar os dados de exemplo? Os lançamentos salvos serão substituídos.")) return;
-  state.entries = sampleEntries.map((item) => ({ ...item, id: crypto.randomUUID() }));
-  state.accounts = [...DEFAULT_ACCOUNTS];
-  state.payments = [...DEFAULT_PAYMENTS];
-  state.incomeSources = [...DEFAULT_INCOME_SOURCES];
-  state.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-  fillSelect(els.incomeSource, state.incomeSources);
-  fillSelect(els.account, state.accounts);
-  fillSelect(els.payment, state.payments);
-  updateCategoryOptions();
-  fillYearFilter(new Date().getFullYear());
-  persist();
-  clearForm();
-  render();
 }
 
 function clearData() {

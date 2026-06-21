@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=35" />
+    <link rel="stylesheet" href="./styles.css?v=37" />
   </head>
   <body>
     <main class="app-shell">
@@ -34,13 +34,6 @@
             <span>Ano</span>
             <select id="yearFilter"></select>
           </label>
-          <label class="field compact language-field">
-            <span>Idioma</span>
-            <select id="languageSelect" aria-label="Selecionar idioma">
-              <option value="pt">Português</option>
-              <option value="en">English</option>
-            </select>
-          </label>
           <label class="field compact currency-field">
             <span>Moeda-base</span>
             <select id="baseCurrency">
@@ -49,11 +42,11 @@
               <option value="USD">USD ($)</option>
             </select>
           </label>
+          <button id="themeToggle" class="secondary theme-toggle" type="button" aria-pressed="false">Tema escuro</button>
           <button id="authButton" class="secondary sync-button" type="button">
             <span id="syncIndicator" class="sync-indicator" aria-hidden="true"></span>
             <span id="authButtonLabel">Entrar e sincronizar</span>
           </button>
-          <button id="themeToggle" class="secondary theme-toggle" type="button" aria-pressed="false">Tema escuro</button>
         </div>
         <button id="utilityMenuToggle" class="utility-menu-toggle" type="button" aria-label="Abrir menu" aria-controls="utilityMenu" aria-expanded="false" title="Abrir menu">
           <span aria-hidden="true"></span>
@@ -364,6 +357,15 @@
         </div>
         <button id="utilityMenuClose" class="icon-close" type="button" aria-label="Fechar menu" title="Fechar menu">&times;</button>
       </div>
+      <div class="utility-menu-settings">
+        <label class="field language-field">
+          <span>Idioma</span>
+          <select id="languageSelect" aria-label="Selecionar idioma">
+            <option value="pt">Português</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </div>
       <nav class="utility-menu-actions" aria-label="Ações da planilha">
         <button id="exportCsv" class="utility-action" type="button">
           <span class="utility-action-icon" aria-hidden="true">CSV</span>
@@ -372,10 +374,6 @@
         <button id="openBackupPanel" class="utility-action" type="button">
           <span class="utility-action-icon" aria-hidden="true">&#x21E9;</span>
           <strong>Backup</strong>
-        </button>
-        <button id="resetData" class="utility-action" type="button">
-          <span class="utility-action-icon" aria-hidden="true">&#x21BB;</span>
-          <strong>Restaurar</strong>
         </button>
         <div class="utility-danger-zone">
           <p>Ação irreversível</p>
@@ -489,6 +487,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=35"></script>
+    <script src="./app.js?v=37"></script>
   </body>
 </html>
