@@ -24,7 +24,7 @@ const STATIC_TRANSLATIONS = {
   "Cancelar edição": "Cancel editing", "Novo lançamento": "New entry", "Cadastros Gerais": "General Records",
   "Nome da planilha": "Spreadsheet name", "Data": "Date", "Referente ao mês": "Reference month", "Tipo": "Type",
   "Receita": "Income", "Despesa": "Expense", "Origem da receita": "Income source", "Descrição": "Description",
-  "Categoria": "Category", "Forma de pagamento": "Payment method", "Conta": "Account", "Valor": "Amount",
+  "Categoria": "Category", "Forma de pagamento": "Payment method", "Formas de pagamento": "Payment methods", "Conta": "Account", "Valor": "Amount",
   "Observações": "Notes", "Salvar lançamento": "Save entry", "Origens Receita": "Income Sources", "Contas": "Accounts",
   "Nova origem de receita": "New income source", "Adicionar": "Add", "Cópia completa": "Full copy",
   "Backup e recuperação": "Backup and recovery", "Baixar backup": "Download backup", "Restaurar backup": "Restore backup",
@@ -232,7 +232,7 @@ function init() {
   fillYearFilter(new Date().getFullYear());
   fillSelect(els.referenceMonth, displayMonths().map((name, index) => ({ label: name, value: index })));
   fillSelect(els.incomeSource, state.incomeSources);
-  fillSelect(els.payment, DEFAULT_PAYMENTS);
+  fillSelect(els.payment, state.payments);
   fillSelect(els.account, state.accounts);
   els.monthFilter.value = new Date().getMonth();
   els.yearFilter.value = new Date().getFullYear();
@@ -351,6 +351,7 @@ function loadState() {
     return {
       entries: sampleEntries,
       accounts: DEFAULT_ACCOUNTS,
+      payments: DEFAULT_PAYMENTS,
       incomeSources: DEFAULT_INCOME_SOURCES,
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       ownerName: DEFAULT_OWNER_NAME,
@@ -371,6 +372,7 @@ function loadState() {
     return {
       entries: Array.isArray(parsed.entries) ? parsed.entries : sampleEntries,
       accounts: Array.isArray(parsed.accounts) ? parsed.accounts : DEFAULT_ACCOUNTS,
+      payments: Array.isArray(parsed.payments) ? parsed.payments : DEFAULT_PAYMENTS,
       incomeSources: Array.isArray(parsed.incomeSources) ? normalizeIncomeSources(parsed.incomeSources) : DEFAULT_INCOME_SOURCES,
       categories: parsed.categories && typeof parsed.categories === "object" ? parsed.categories : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       ownerName: typeof parsed.ownerName === "string" && parsed.ownerName.trim() ? parsed.ownerName : DEFAULT_OWNER_NAME,
@@ -388,6 +390,7 @@ function loadState() {
     return {
       entries: sampleEntries,
       accounts: DEFAULT_ACCOUNTS,
+      payments: DEFAULT_PAYMENTS,
       incomeSources: DEFAULT_INCOME_SOURCES,
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       ownerName: DEFAULT_OWNER_NAME,
@@ -644,6 +647,7 @@ async function loadRemoteState() {
 function applyRemoteState(remote) {
   state.entries = Array.isArray(remote.entries) ? remote.entries : [];
   state.accounts = Array.isArray(remote.accounts) ? remote.accounts : [...DEFAULT_ACCOUNTS];
+  state.payments = Array.isArray(remote.payments) ? remote.payments : [...DEFAULT_PAYMENTS];
   state.incomeSources = Array.isArray(remote.incomeSources) ? normalizeIncomeSources(remote.incomeSources) : [...DEFAULT_INCOME_SOURCES];
   state.categories = remote.categories && typeof remote.categories === "object" ? remote.categories : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
   state.ownerName = typeof remote.ownerName === "string" && remote.ownerName.trim() ? remote.ownerName : DEFAULT_OWNER_NAME;
@@ -660,6 +664,7 @@ function applyRemoteState(remote) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   fillSelect(els.incomeSource, state.incomeSources);
   fillSelect(els.account, state.accounts);
+  fillSelect(els.payment, state.payments);
   els.languageSelect.value = state.language;
   els.baseCurrency.value = state.baseCurrency;
   els.exchangePair.value = state.exchangePair;
@@ -1602,6 +1607,7 @@ function editEntry(id) {
   els.description.value = item.description;
   ensureCategoryOption(item.category);
   els.category.value = item.category;
+  ensurePaymentOption(item.payment);
   els.payment.value = item.payment;
   els.account.value = item.account;
   els.currency.value = item.currency || "BRL";
@@ -1631,6 +1637,14 @@ function ensureCategoryOption(category) {
   els.category.append(option);
 }
 
+function ensurePaymentOption(payment) {
+  if (!payment || state.payments.includes(payment)) return;
+  const option = document.createElement("option");
+  option.value = payment;
+  option.textContent = `${payment} (${ui("histórico", "history")})`;
+  els.payment.append(option);
+}
+
 function generalRegistrationConfig() {
   if (activeSubRegistrationTab === "categories") {
     return {
@@ -1649,6 +1663,16 @@ function generalRegistrationConfig() {
       items: state.accounts,
       duplicateMessage: ui("Esta conta já está cadastrada.", "This account is already registered."),
       removeMessage: ui("contas", "accounts"),
+    };
+  }
+
+  if (activeSubRegistrationTab === "payments") {
+    return {
+      label: ui("Nova forma de pagamento", "New payment method"),
+      placeholder: ui("Ex.: PayPal, cheque, vale", "E.g.: PayPal, cheque, voucher"),
+      items: state.payments,
+      duplicateMessage: ui("Esta forma de pagamento já está cadastrada.", "This payment method is already registered."),
+      removeMessage: ui("formas de pagamento", "payment methods"),
     };
   }
 
@@ -1680,6 +1704,10 @@ function addGeneralRegistrationItem(event) {
     state.accounts = [...state.accounts, cleanName];
     fillSelect(els.account, state.accounts);
     els.account.value = cleanName;
+  } else if (activeSubRegistrationTab === "payments") {
+    state.payments = [...state.payments, cleanName];
+    fillSelect(els.payment, state.payments);
+    els.payment.value = cleanName;
   } else {
     state.incomeSources = normalizeIncomeSources([...state.incomeSources, cleanName]);
     fillSelect(els.incomeSource, state.incomeSources);
@@ -1709,6 +1737,9 @@ function removeGeneralRegistrationItem(event) {
   } else if (activeSubRegistrationTab === "accounts") {
     state.accounts = state.accounts.filter((item) => item !== selectedItem);
     fillSelect(els.account, state.accounts);
+  } else if (activeSubRegistrationTab === "payments") {
+    state.payments = state.payments.filter((item) => item !== selectedItem);
+    fillSelect(els.payment, state.payments);
   } else {
     state.incomeSources = normalizeIncomeSources(state.incomeSources.filter((item) => item !== selectedItem));
     fillSelect(els.incomeSource, state.incomeSources);
@@ -1860,10 +1891,12 @@ function resetData() {
   if (!confirm("Restaurar os dados de exemplo? Os lançamentos salvos serão substituídos.")) return;
   state.entries = sampleEntries.map((item) => ({ ...item, id: crypto.randomUUID() }));
   state.accounts = [...DEFAULT_ACCOUNTS];
+  state.payments = [...DEFAULT_PAYMENTS];
   state.incomeSources = [...DEFAULT_INCOME_SOURCES];
   state.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
   fillSelect(els.incomeSource, state.incomeSources);
   fillSelect(els.account, state.accounts);
+  fillSelect(els.payment, state.payments);
   updateCategoryOptions();
   fillYearFilter(new Date().getFullYear());
   persist();
