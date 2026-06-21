@@ -673,6 +673,10 @@ select:focus {
   width: 100%;
 }
 
+.sortable-modules > [data-module-id="dashboard"][data-module-size="half"] .dashboard-charts {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .module-sort-ghost {
   opacity: 0.3;
   border: 1px dashed var(--primary);
@@ -1253,9 +1257,13 @@ body.dark .fill.accent {
 
 .month-chart {
   display: grid;
-  grid-template-columns: repeat(12, minmax(22px, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: end;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   min-height: 200px;
   padding: 10px 0 0;
 }
@@ -1264,6 +1272,7 @@ body.dark .fill.accent {
   display: grid;
   align-items: end;
   gap: 8px;
+  min-width: 0;
   height: 200px;
   cursor: pointer;
 }
@@ -1295,6 +1304,9 @@ body.dark .fill.accent {
 }
 
 .month-column small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 700;
