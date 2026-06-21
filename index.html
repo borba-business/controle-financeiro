@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=27" />
+    <link rel="stylesheet" href="./styles.css?v=28" />
   </head>
   <body>
     <main class="app-shell">
@@ -121,6 +121,20 @@
 
             <form id="entryForm" class="entry-form registration-tab-panel">
               <input id="editingId" type="hidden" />
+              <section class="receipt-reader wide" aria-labelledby="receiptReaderTitle">
+                <div class="receipt-reader-copy">
+                  <span class="receipt-reader-icon" aria-hidden="true">▣</span>
+                  <div>
+                    <strong id="receiptReaderTitle">Ler comprovante</strong>
+                    <small>Fotografe ou selecione uma imagem ou PDF. O arquivo será descartado após a leitura.</small>
+                  </div>
+                </div>
+                <div class="receipt-reader-actions">
+                  <button id="selectReceipt" class="secondary" type="button">Selecionar comprovante</button>
+                  <input id="receiptFile" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" />
+                </div>
+                <p id="receiptStatus" class="receipt-status" role="status"></p>
+              </section>
               <label class="field">
                 <span>Data</span>
                 <input id="date" type="date" required />
@@ -422,6 +436,25 @@
       </div>
     </dialog>
 
-    <script src="./app.js?v=27"></script>
+    <dialog id="receiptReviewDialog" class="receipt-review-dialog" aria-labelledby="receiptReviewTitle">
+      <div class="receipt-review-content">
+        <div class="receipt-review-header">
+          <div>
+            <p class="eyebrow">Leitura inteligente</p>
+            <h2 id="receiptReviewTitle">Confira os dados encontrados</h2>
+          </div>
+          <button id="closeReceiptReview" class="icon-close" type="button" aria-label="Fechar" title="Fechar">×</button>
+        </div>
+        <div id="receiptReviewSummary" class="receipt-review-summary"></div>
+        <div id="receiptReviewWarnings" class="receipt-review-warnings hidden" role="status"></div>
+        <p class="receipt-privacy-note">O comprovante já foi descartado. Somente estes dados serão usados para preencher o formulário.</p>
+        <div class="receipt-review-actions">
+          <button id="cancelReceiptReview" class="secondary" type="button">Cancelar</button>
+          <button id="applyReceiptData" class="primary" type="button">Usar estes dados</button>
+        </div>
+      </div>
+    </dialog>
+
+    <script src="./app.js?v=28"></script>
   </body>
 </html>

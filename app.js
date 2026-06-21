@@ -45,6 +45,16 @@ const STATIC_TRANSLATIONS = {
   "Todos os lançamentos de receitas e despesas serão apagados permanentemente. Os cadastros e o nome da planilha serão mantidos.": "All income and expense entries will be permanently deleted. Records and the spreadsheet name will be kept."
 };
 
+Object.assign(STATIC_TRANSLATIONS, {
+  "Ler comprovante": "Read receipt",
+  "Selecionar comprovante": "Select receipt",
+  "Leitura inteligente": "Smart reading",
+  "Confira os dados encontrados": "Review the extracted data",
+  "Usar estes dados": "Use this data",
+  "O comprovante já foi descartado. Somente estes dados serão usados para preencher o formulário.": "The receipt has already been discarded. Only this data will be used to fill in the form.",
+  "Fotografe ou selecione uma imagem ou PDF. O arquivo será descartado após a leitura.": "Take a photo or select an image or PDF. The file will be discarded after reading.",
+});
+
 const PLACEHOLDER_TRANSLATIONS = {
   "Ex.: IPVA, UNIMED, mercado": "E.g.: tax, healthcare, groceries", "Opcional": "Optional", "Digite um nome": "Enter a name",
   "Ex.: Mercado, aluguel, cliente": "E.g.: store, rent, client", "Descrição, categoria, conta...": "Description, category, account..."
@@ -95,6 +105,7 @@ let expandedChartBaseWidth = 1100;
 let expandedChartWidth = 1100;
 let expandedChartZoom = 1;
 let expandedChartPan = null;
+let pendingReceiptExtraction = null;
 
 const els = {
   monthFilter: document.querySelector("#monthFilter"),
@@ -138,6 +149,15 @@ const els = {
   incomeSummaryPanel: document.querySelector("#incomeSummaryPanel"),
   nameSheetPanel: document.querySelector("#nameSheetPanel"),
   entryForm: document.querySelector("#entryForm"),
+  selectReceipt: document.querySelector("#selectReceipt"),
+  receiptFile: document.querySelector("#receiptFile"),
+  receiptStatus: document.querySelector("#receiptStatus"),
+  receiptReviewDialog: document.querySelector("#receiptReviewDialog"),
+  closeReceiptReview: document.querySelector("#closeReceiptReview"),
+  cancelReceiptReview: document.querySelector("#cancelReceiptReview"),
+  applyReceiptData: document.querySelector("#applyReceiptData"),
+  receiptReviewSummary: document.querySelector("#receiptReviewSummary"),
+  receiptReviewWarnings: document.querySelector("#receiptReviewWarnings"),
   cancelEdit: document.querySelector("#cancelEdit"),
   editingId: document.querySelector("#editingId"),
   date: document.querySelector("#date"),
@@ -289,6 +309,14 @@ function bindEvents() {
     if (event.target === els.exchangeChartDialog) els.exchangeChartDialog.close();
   });
   els.entryForm.addEventListener("submit", saveEntry);
+  els.selectReceipt.addEventListener("click", () => els.receiptFile.click());
+  els.receiptFile.addEventListener("change", readReceipt);
+  els.closeReceiptReview.addEventListener("click", closeReceiptReview);
+  els.cancelReceiptReview.addEventListener("click", closeReceiptReview);
+  els.applyReceiptData.addEventListener("click", applyReceiptExtraction);
+  els.receiptReviewDialog.addEventListener("click", (event) => {
+    if (event.target === els.receiptReviewDialog) closeReceiptReview();
+  });
   els.cancelEdit.addEventListener("click", clearForm);
   els.incomeSourceForm.addEventListener("submit", addGeneralRegistrationItem);
   els.incomeSourcesList.addEventListener("click", removeGeneralRegistrationItem);
@@ -345,6 +373,159 @@ function bindEvents() {
     if (button.dataset.action === "edit") editEntry(button.dataset.id);
     if (button.dataset.action === "delete") deleteEntry(button.dataset.id);
   });
+}
+
+function setReceiptStatus(message, type = "") {
+  els.receiptStatus.textContent = message;
+  els.receiptStatus.className = `receipt-status${type ? ` ${type}` : ""}`;
+}
+
+async function readReceipt() {
+  const file = els.receiptFile.files?.[0];
+  if (!file) return;
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+  if (!allowedTypes.includes(file.type)) {
+    setReceiptStatus(ui("Formato não aceito. Use JPG, PNG, WEBP ou PDF.", "Unsupported format. Use JPG, PNG, WEBP, or PDF."), "error");
+    els.receiptFile.value = "";
+    return;
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    setReceiptStatus(ui("O arquivo deve ter no máximo 8 MB.", "The file must be no larger than 8 MB."), "error");
+    els.receiptFile.value = "";
+    return;
+  }
+
+  const session = await ensureSession();
+  if (!session?.access_token) {
+    setReceiptStatus(ui("Entre na sua conta para usar a leitura inteligente.", "Sign in to use smart receipt reading."), "error");
+    els.receiptFile.value = "";
+    openAuthDialog();
+    return;
+  }
+
+  els.selectReceipt.disabled = true;
+  setReceiptStatus(ui("Lendo o comprovante com segurança...", "Reading the receipt securely..."));
+
+  try {
+    const fileData = await fileToDataUrl(file);
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/read-receipt`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: file.type,
+        fileData,
+        context: {
+          language: state.language,
+          today: new Date().toISOString().slice(0, 10),
+          categories: currentCategoryOptions(),
+          payments: state.payments,
+          accounts: state.accounts,
+          incomeSources: state.incomeSources,
+          baseCurrency: state.baseCurrency,
+        },
+      }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || ui("Não foi possível ler o comprovante.", "Could not read the receipt."));
+
+    pendingReceiptExtraction = payload.data;
+    showReceiptReview(pendingReceiptExtraction);
+    setReceiptStatus(ui("Leitura concluída. Confira os dados antes de salvar.", "Reading complete. Review the data before saving."), "success");
+  } catch (error) {
+    setReceiptStatus(error.message || ui("Não foi possível ler o comprovante.", "Could not read the receipt."), "error");
+  } finally {
+    els.receiptFile.value = "";
+    els.selectReceipt.disabled = false;
+  }
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error(ui("Não foi possível abrir o arquivo.", "Could not open the file.")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function showReceiptReview(data) {
+  const labels = [
+    [ui("Tipo", "Type"), data.type],
+    [ui("Data", "Date"), data.date ? formatDate(data.date) : ui("Não identificada", "Not identified")],
+    [ui("Descrição", "Description"), data.description],
+    [ui("Categoria", "Category"), data.category],
+    [ui("Forma de pagamento", "Payment method"), data.payment],
+    [ui("Conta", "Account"), data.account],
+    [ui("Valor", "Amount"), data.amount ? money(data.amount, data.currency || state.baseCurrency) : ui("Não identificado", "Not identified")],
+    [ui("Confiança da leitura", "Reading confidence"), `${Math.round(Number(data.confidence || 0) * 100)}%`],
+  ];
+
+  els.receiptReviewSummary.replaceChildren(...labels.map(([label, value]) => {
+    const item = document.createElement("div");
+    item.className = "receipt-review-item";
+    const name = document.createElement("span");
+    const content = document.createElement("strong");
+    name.textContent = label;
+    content.textContent = value || ui("Revisar", "Review");
+    item.append(name, content);
+    return item;
+  }));
+
+  const warnings = Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : [];
+  els.receiptReviewWarnings.classList.toggle("hidden", !warnings.length);
+  els.receiptReviewWarnings.textContent = warnings.join(" ");
+  els.receiptReviewDialog.showModal();
+}
+
+function closeReceiptReview() {
+  pendingReceiptExtraction = null;
+  els.receiptReviewDialog.close();
+}
+
+function normalizedValue(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+}
+
+function selectSuggestedValue(select, suggestion) {
+  const normalizedSuggestion = normalizedValue(suggestion);
+  if (!normalizedSuggestion) return false;
+  const option = [...select.options].find((item) => normalizedValue(item.value) === normalizedSuggestion);
+  if (!option) return false;
+  select.value = option.value;
+  return true;
+}
+
+function applyReceiptExtraction() {
+  const data = pendingReceiptExtraction;
+  if (!data) return;
+
+  els.type.value = data.type === "Receita" ? "Receita" : "Despesa";
+  updateCategoryOptions();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(data.date || "")) {
+    els.date.value = data.date;
+    els.referenceMonth.value = new Date(`${data.date}T00:00:00`).getMonth();
+  }
+  els.description.value = data.description || "";
+  selectSuggestedValue(els.category, data.category);
+  selectSuggestedValue(els.payment, data.payment);
+  selectSuggestedValue(els.account, data.account);
+  selectSuggestedValue(els.currency, data.currency);
+  if (Number(data.amount) > 0) els.amount.value = Number(data.amount).toFixed(2);
+  if (els.type.value === "Receita") selectSuggestedValue(els.incomeSource, data.incomeSource);
+  els.notes.value = data.notes || "";
+  updateConversionPreview();
+
+  pendingReceiptExtraction = null;
+  els.receiptReviewDialog.close();
+  setReceiptStatus(ui("Dados preenchidos. Revise o formulário e clique em Salvar lançamento.", "Data filled in. Review the form and click Save entry."), "success");
+  els.entryForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  requestAnimationFrame(() => els.description.focus());
 }
 
 function accountStorageKey(userId) {
