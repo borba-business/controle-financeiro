@@ -352,16 +352,15 @@ function accountStorageKey(userId) {
 }
 
 function loadState(storageKey = activeStorageKey) {
-  const saved = localStorage.getItem(storageKey);
-  const isAccountStorage = storageKey !== STORAGE_KEY;
+  const saved = storageKey === STORAGE_KEY ? null : localStorage.getItem(storageKey);
   if (!saved) {
     return {
-      entries: isAccountStorage ? [] : sampleEntries,
+      entries: [],
       accounts: DEFAULT_ACCOUNTS,
       payments: DEFAULT_PAYMENTS,
       incomeSources: DEFAULT_INCOME_SOURCES,
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
-      ownerName: isAccountStorage ? NEW_USER_OWNER_NAME : DEFAULT_OWNER_NAME,
+      ownerName: NEW_USER_OWNER_NAME,
       theme: "light",
       language: "pt",
       baseCurrency: "EUR",
@@ -382,7 +381,7 @@ function loadState(storageKey = activeStorageKey) {
       payments: Array.isArray(parsed.payments) ? parsed.payments : DEFAULT_PAYMENTS,
       incomeSources: Array.isArray(parsed.incomeSources) ? normalizeIncomeSources(parsed.incomeSources) : DEFAULT_INCOME_SOURCES,
       categories: parsed.categories && typeof parsed.categories === "object" ? parsed.categories : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
-      ownerName: typeof parsed.ownerName === "string" && parsed.ownerName.trim() ? parsed.ownerName : (isAccountStorage ? NEW_USER_OWNER_NAME : DEFAULT_OWNER_NAME),
+      ownerName: typeof parsed.ownerName === "string" && parsed.ownerName.trim() ? parsed.ownerName : NEW_USER_OWNER_NAME,
       theme: parsed.theme === "dark" ? "dark" : "light",
       language: parsed.language === "en" ? "en" : "pt",
       baseCurrency: ["EUR", "BRL", "USD"].includes(parsed.baseCurrency) ? parsed.baseCurrency : "EUR",
@@ -395,12 +394,12 @@ function loadState(storageKey = activeStorageKey) {
     };
   } catch {
     return {
-      entries: isAccountStorage ? [] : sampleEntries,
+      entries: [],
       accounts: DEFAULT_ACCOUNTS,
       payments: DEFAULT_PAYMENTS,
       incomeSources: DEFAULT_INCOME_SOURCES,
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
-      ownerName: isAccountStorage ? NEW_USER_OWNER_NAME : DEFAULT_OWNER_NAME,
+      ownerName: NEW_USER_OWNER_NAME,
       theme: "light",
       language: "pt",
       baseCurrency: "EUR",
