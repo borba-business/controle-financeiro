@@ -1249,6 +1249,13 @@ function ratesForEntry(item) {
   return item.rates || state.exchangeRatesCache[item.date]?.rates || state.exchangeRatesCache.latest?.rates || null;
 }
 
+function rateDateForEntry(item) {
+  return item.rateDate
+    || state.exchangeRatesCache[item.date]?.rateDate
+    || state.exchangeRatesCache.latest?.rateDate
+    || item.date;
+}
+
 function convertCurrency(amount, sourceCurrency, targetCurrency, rates) {
   const numericAmount = Number(amount || 0);
   if (sourceCurrency === targetCurrency) return numericAmount;
@@ -1515,7 +1522,7 @@ function renderTable() {
             <strong>${money(item.amount, item.currency || "BRL")}</strong>
             ${(item.currency || "BRL") !== state.baseCurrency
               ? ratesForEntry(item)
-                ? `<br><small>≈ ${money(entryValue(item))}</small>`
+                ? `<br><small>≈ ${money(entryValue(item))} · ${ui("Cotação dia", "Rate date")} ${formatDate(rateDateForEntry(item))}</small>`
                 : `<br><small>${ui("Cotação pendente", "Rate pending")}</small>`
               : ""}
           </td>
