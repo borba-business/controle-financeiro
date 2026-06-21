@@ -46,6 +46,8 @@ const STATIC_TRANSLATIONS = {
 };
 
 Object.assign(STATIC_TRANSLATIONS, {
+  "Ferramentas": "Tools",
+  "Ações da planilha": "Spreadsheet actions",
   "Ler comprovante": "Read receipt",
   "Selecionar comprovante": "Select receipt",
   "Leitura local": "Local reading",
@@ -135,6 +137,11 @@ const els = {
   exportCsv: document.querySelector("#exportCsv"),
   resetData: document.querySelector("#resetData"),
   clearData: document.querySelector("#clearData"),
+  utilityMenuToggle: document.querySelector("#utilityMenuToggle"),
+  utilityMenu: document.querySelector("#utilityMenu"),
+  utilityMenuClose: document.querySelector("#utilityMenuClose"),
+  utilityMenuBackdrop: document.querySelector("#utilityMenuBackdrop"),
+  openBackupPanel: document.querySelector("#openBackupPanel"),
   authButton: document.querySelector("#authButton"),
   authButtonLabel: document.querySelector("#authButtonLabel"),
   clearDataDialog: document.querySelector("#clearDataDialog"),
@@ -504,6 +511,14 @@ function bindEvents() {
   els.exportCsv.addEventListener("click", exportCsv);
   els.resetData.addEventListener("click", resetData);
   els.clearData.addEventListener("click", clearData);
+  els.utilityMenuToggle.addEventListener("click", openUtilityMenu);
+  els.utilityMenuClose.addEventListener("click", closeUtilityMenu);
+  els.utilityMenuBackdrop.addEventListener("click", closeUtilityMenu);
+  els.openBackupPanel.addEventListener("click", openBackupFromUtilityMenu);
+  els.exportCsv.addEventListener("click", closeUtilityMenu);
+  els.resetData.addEventListener("click", closeUtilityMenu);
+  els.clearData.addEventListener("click", closeUtilityMenu);
+  document.addEventListener("keydown", handleUtilityMenuKeydown);
   els.cancelClearData.addEventListener("click", closeClearDataDialog);
   els.clearDataConfirmation.addEventListener("input", updateClearDataConfirmation);
   els.clearDataForm.addEventListener("submit", confirmClearData);
@@ -2405,6 +2420,56 @@ function updateThemeButton() {
   const isDark = state.theme === "dark";
   els.themeToggle.textContent = isDark ? ui("Tema claro", "Light theme") : ui("Tema escuro", "Dark theme");
   els.themeToggle.setAttribute("aria-pressed", String(isDark));
+}
+
+function openUtilityMenu() {
+  els.utilityMenuBackdrop.hidden = false;
+  document.body.classList.add("utility-menu-open");
+  els.utilityMenu.classList.add("open");
+  els.utilityMenuBackdrop.classList.add("open");
+  els.utilityMenu.setAttribute("aria-hidden", "false");
+  els.utilityMenuToggle.setAttribute("aria-expanded", "true");
+  requestAnimationFrame(() => els.utilityMenuClose.focus());
+}
+
+function closeUtilityMenu() {
+  if (!els.utilityMenu.classList.contains("open")) return;
+  document.body.classList.remove("utility-menu-open");
+  els.utilityMenu.classList.remove("open");
+  els.utilityMenuBackdrop.classList.remove("open");
+  els.utilityMenu.setAttribute("aria-hidden", "true");
+  els.utilityMenuToggle.setAttribute("aria-expanded", "false");
+  window.setTimeout(() => {
+    if (!els.utilityMenu.classList.contains("open")) els.utilityMenuBackdrop.hidden = true;
+  }, 260);
+  els.utilityMenuToggle.focus();
+}
+
+function handleUtilityMenuKeydown(event) {
+  if (!els.utilityMenu.classList.contains("open")) return;
+  if (event.key === "Escape") {
+    closeUtilityMenu();
+    return;
+  }
+  if (event.key !== "Tab") return;
+
+  const focusable = Array.from(els.utilityMenu.querySelectorAll("button:not([disabled])"));
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function openBackupFromUtilityMenu() {
+  activeRegistrationTab = "backup";
+  renderRegistrationTabs();
+  closeUtilityMenu();
+  document.querySelector(".registrations-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderVisualTabs() {

@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=34" />
+    <link rel="stylesheet" href="./styles.css?v=35" />
   </head>
   <body>
     <main class="app-shell">
@@ -54,10 +54,12 @@
             <span id="authButtonLabel">Entrar e sincronizar</span>
           </button>
           <button id="themeToggle" class="secondary theme-toggle" type="button" aria-pressed="false">Tema escuro</button>
-          <button id="exportCsv" class="secondary" type="button">Exportar CSV</button>
-          <button id="resetData" class="ghost" type="button">Restaurar</button>
-          <button id="clearData" class="ghost-danger" type="button">Limpar Planilha</button>
         </div>
+        <button id="utilityMenuToggle" class="utility-menu-toggle" type="button" aria-label="Abrir menu" aria-controls="utilityMenu" aria-expanded="false" title="Abrir menu">
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </button>
       </section>
 
       <section class="summary-grid" aria-label="Resumo do mês">
@@ -116,7 +118,6 @@
               <button class="tab-button active" type="button" data-registration-tab="entry">Novo lançamento</button>
               <button class="tab-button" type="button" data-registration-tab="incomeSources">Cadastros Gerais</button>
               <button class="tab-button" type="button" data-registration-tab="name">Nome da planilha</button>
-              <button class="tab-button" type="button" data-registration-tab="backup">Backup</button>
             </div>
 
             <form id="entryForm" class="entry-form registration-tab-panel">
@@ -354,6 +355,38 @@
       </section>
     </main>
 
+    <div id="utilityMenuBackdrop" class="utility-menu-backdrop" hidden></div>
+    <aside id="utilityMenu" class="utility-menu" aria-hidden="true" aria-labelledby="utilityMenuTitle">
+      <div class="utility-menu-header">
+        <div>
+          <p class="eyebrow">Ferramentas</p>
+          <h2 id="utilityMenuTitle">Ações da planilha</h2>
+        </div>
+        <button id="utilityMenuClose" class="icon-close" type="button" aria-label="Fechar menu" title="Fechar menu">&times;</button>
+      </div>
+      <nav class="utility-menu-actions" aria-label="Ações da planilha">
+        <button id="exportCsv" class="utility-action" type="button">
+          <span class="utility-action-icon" aria-hidden="true">CSV</span>
+          <strong>Exportar CSV</strong>
+        </button>
+        <button id="openBackupPanel" class="utility-action" type="button">
+          <span class="utility-action-icon" aria-hidden="true">&#x21E9;</span>
+          <strong>Backup</strong>
+        </button>
+        <button id="resetData" class="utility-action" type="button">
+          <span class="utility-action-icon" aria-hidden="true">&#x21BB;</span>
+          <strong>Restaurar</strong>
+        </button>
+        <div class="utility-danger-zone">
+          <p>Ação irreversível</p>
+          <button id="clearData" class="utility-action utility-action-danger" type="button">
+            <span class="utility-action-icon" aria-hidden="true">!</span>
+            <strong>Limpar Planilha</strong>
+          </button>
+        </div>
+      </nav>
+    </aside>
+
     <dialog id="exchangeChartDialog" class="exchange-chart-dialog" aria-labelledby="expandedExchangeChartTitle">
       <div class="exchange-chart-dialog-content">
         <div class="exchange-chart-dialog-header">
@@ -456,6 +489,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=34"></script>
+    <script src="./app.js?v=35"></script>
   </body>
 </html>
