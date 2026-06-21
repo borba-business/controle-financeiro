@@ -1781,8 +1781,11 @@ function resizeExpandedSvg(targetWidth, targetHeight = 520, initial = false) {
   const svg = els.expandedExchangeChart.querySelector("svg");
   if (!svg) return;
 
-  const scaleX = initial ? targetWidth / 720 : targetWidth / expandedChartWidth;
-  const scaleY = initial ? targetHeight / 270 : 1;
+  const viewBox = (svg.getAttribute("viewBox") || "0 0 720 270").split(/\s+/).map(Number);
+  const sourceWidth = Number.isFinite(viewBox[2]) && viewBox[2] > 0 ? viewBox[2] : 720;
+  const sourceHeight = Number.isFinite(viewBox[3]) && viewBox[3] > 0 ? viewBox[3] : 270;
+  const scaleX = initial ? targetWidth / sourceWidth : targetWidth / expandedChartWidth;
+  const scaleY = initial ? targetHeight / sourceHeight : 1;
   const horizontalAttributes = ["x", "x1", "x2", "cx"];
   const verticalAttributes = ["y", "y1", "y2", "cy"];
 
