@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=18" />
+    <link rel="stylesheet" href="./styles.css?v=20" />
   </head>
   <body>
     <main class="app-shell">
@@ -260,17 +260,40 @@
           <section class="panel exchange-rate-panel">
             <div class="panel-title exchange-rate-title">
               <h2>Gráfico Cotações Tempo Real</h2>
-              <label class="field exchange-pair-field">
-                <span>Par de moedas</span>
-                <select id="exchangePair">
-                  <option value="EUR/BRL">EUR/BRL</option>
-                  <option value="BRL/EUR">BRL/EUR</option>
-                  <option value="EUR/USD">EUR/USD</option>
-                  <option value="USD/EUR">USD/EUR</option>
-                  <option value="BRL/USD">BRL/USD</option>
-                  <option value="USD/BRL">USD/BRL</option>
-                </select>
+              <div class="exchange-controls">
+                <label class="field exchange-period-field">
+                  <span>Período</span>
+                  <select id="exchangePeriod">
+                    <option value="1m">1 mês</option>
+                    <option value="3m">3 meses</option>
+                    <option value="6m">6 meses</option>
+                    <option value="1y">1 ano</option>
+                    <option value="custom">Personalizado</option>
+                  </select>
+                </label>
+                <label class="field exchange-pair-field">
+                  <span>Par de moedas</span>
+                  <select id="exchangePair">
+                    <option value="EUR/BRL">EUR/BRL</option>
+                    <option value="BRL/EUR">BRL/EUR</option>
+                    <option value="EUR/USD">EUR/USD</option>
+                    <option value="USD/EUR">USD/EUR</option>
+                    <option value="BRL/USD">BRL/USD</option>
+                    <option value="USD/BRL">USD/BRL</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div id="exchangeCustomRange" class="exchange-custom-range" hidden>
+              <label class="field">
+                <span>Data inicial</span>
+                <input id="exchangeStartDate" type="date" min="1999-01-04" />
               </label>
+              <label class="field">
+                <span>Data final</span>
+                <input id="exchangeEndDate" type="date" min="1999-01-04" />
+              </label>
+              <button id="searchExchangeRange" class="primary-button" type="button">Pesquisar</button>
             </div>
             <div class="exchange-stats">
               <div><span>Atual</span><strong id="exchangeCurrent">—</strong></div>
@@ -375,6 +398,6 @@
       </div>
     </dialog>
 
-    <script src="./app.js?v=18"></script>
+    <script src="./app.js?v=20"></script>
   </body>
 </html>

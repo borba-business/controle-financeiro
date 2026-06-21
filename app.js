@@ -36,7 +36,9 @@ const STATIC_TRANSLATIONS = {
   "Sincronização segura": "Secure synchronization", "Acessar seus dados": "Access your data", "E-mail": "Email", "Senha": "Password",
   "Criar conta": "Create account", "Entrar": "Sign in", "Conta conectada": "Connected account", "Sincronização pronta": "Sync ready",
   "Sair": "Sign out", "Sincronizar agora": "Sync now", "Gráfico Cotações Tempo Real": "Real-Time Exchange Rate Chart",
-  "Par de moedas": "Currency pair", "Atual": "Current", "Mínima": "Low", "Máxima": "High", "Digite": "Type", "para confirmar": "to confirm",
+  "Par de moedas": "Currency pair", "Período": "Period", "1 mês": "1 month", "3 meses": "3 months", "6 meses": "6 months", "1 ano": "1 year",
+  "Personalizado": "Custom", "Data inicial": "Start date", "Data final": "End date", "Pesquisar": "Search",
+  "Atual": "Current", "Mínima": "Low", "Máxima": "High", "Digite": "Type", "para confirmar": "to confirm",
   "Todos os lançamentos de receitas e despesas serão apagados permanentemente. Os cadastros e o nome da planilha serão mantidos.": "All income and expense entries will be permanently deleted. Records and the spreadsheet name will be kept."
 };
 
@@ -140,6 +142,11 @@ const els = {
   amount: document.querySelector("#amount"),
   conversionPreview: document.querySelector("#conversionPreview"),
   exchangePair: document.querySelector("#exchangePair"),
+  exchangePeriod: document.querySelector("#exchangePeriod"),
+  exchangeCustomRange: document.querySelector("#exchangeCustomRange"),
+  exchangeStartDate: document.querySelector("#exchangeStartDate"),
+  exchangeEndDate: document.querySelector("#exchangeEndDate"),
+  searchExchangeRange: document.querySelector("#searchExchangeRange"),
   exchangeCurrent: document.querySelector("#exchangeCurrent"),
   exchangeMin: document.querySelector("#exchangeMin"),
   exchangeMax: document.querySelector("#exchangeMax"),
@@ -201,6 +208,8 @@ function init() {
   els.baseCurrency.value = state.baseCurrency;
   els.currency.value = state.baseCurrency;
   els.exchangePair.value = state.exchangePair;
+  els.exchangePeriod.value = state.exchangePeriod;
+  initializeExchangeRangeControls();
   fillSelect(els.monthFilter, displayMonths().map((name, index) => ({ label: name, value: index })));
   fillYearFilter(new Date().getFullYear());
   fillSelect(els.referenceMonth, displayMonths().map((name, index) => ({ label: name, value: index })));
@@ -242,6 +251,8 @@ function bindEvents() {
   els.amount.addEventListener("input", updateConversionPreview);
   els.date.addEventListener("change", updateConversionPreview);
   els.exchangePair.addEventListener("change", changeExchangePair);
+  els.exchangePeriod.addEventListener("change", changeExchangePeriod);
+  els.searchExchangeRange.addEventListener("click", searchCustomExchangeRange);
   els.entryForm.addEventListener("submit", saveEntry);
   els.cancelEdit.addEventListener("click", clearForm);
   els.incomeSourceForm.addEventListener("submit", addGeneralRegistrationItem);
@@ -315,6 +326,9 @@ function loadState() {
       baseCurrency: "EUR",
       exchangeRatesCache: {},
       exchangePair: "EUR/BRL",
+      exchangePeriod: "1m",
+      exchangeCustomStart: null,
+      exchangeCustomEnd: null,
       exchangeHistory: null,
     };
   }
@@ -332,6 +346,9 @@ function loadState() {
       baseCurrency: ["EUR", "BRL", "USD"].includes(parsed.baseCurrency) ? parsed.baseCurrency : "EUR",
       exchangeRatesCache: parsed.exchangeRatesCache && typeof parsed.exchangeRatesCache === "object" ? parsed.exchangeRatesCache : {},
       exchangePair: typeof parsed.exchangePair === "string" ? parsed.exchangePair : "EUR/BRL",
+      exchangePeriod: ["1m", "3m", "6m", "1y", "custom"].includes(parsed.exchangePeriod) ? parsed.exchangePeriod : "1m",
+      exchangeCustomStart: typeof parsed.exchangeCustomStart === "string" ? parsed.exchangeCustomStart : null,
+      exchangeCustomEnd: typeof parsed.exchangeCustomEnd === "string" ? parsed.exchangeCustomEnd : null,
       exchangeHistory: parsed.exchangeHistory && typeof parsed.exchangeHistory === "object" ? parsed.exchangeHistory : null,
     };
   } catch {
@@ -346,6 +363,9 @@ function loadState() {
       baseCurrency: "EUR",
       exchangeRatesCache: {},
       exchangePair: "EUR/BRL",
+      exchangePeriod: "1m",
+      exchangeCustomStart: null,
+      exchangeCustomEnd: null,
       exchangeHistory: null,
     };
   }
@@ -599,6 +619,9 @@ function applyRemoteState(remote) {
   state.baseCurrency = ["EUR", "BRL", "USD"].includes(remote.baseCurrency) ? remote.baseCurrency : state.baseCurrency || "EUR";
   state.exchangeRatesCache = remote.exchangeRatesCache && typeof remote.exchangeRatesCache === "object" ? remote.exchangeRatesCache : state.exchangeRatesCache || {};
   state.exchangePair = typeof remote.exchangePair === "string" ? remote.exchangePair : state.exchangePair || "EUR/BRL";
+  state.exchangePeriod = ["1m", "3m", "6m", "1y", "custom"].includes(remote.exchangePeriod) ? remote.exchangePeriod : state.exchangePeriod || "1m";
+  state.exchangeCustomStart = typeof remote.exchangeCustomStart === "string" ? remote.exchangeCustomStart : state.exchangeCustomStart || null;
+  state.exchangeCustomEnd = typeof remote.exchangeCustomEnd === "string" ? remote.exchangeCustomEnd : state.exchangeCustomEnd || null;
   state.exchangeHistory = remote.exchangeHistory && typeof remote.exchangeHistory === "object" ? remote.exchangeHistory : state.exchangeHistory || null;
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -607,6 +630,8 @@ function applyRemoteState(remote) {
   els.languageSelect.value = state.language;
   els.baseCurrency.value = state.baseCurrency;
   els.exchangePair.value = state.exchangePair;
+  els.exchangePeriod.value = state.exchangePeriod;
+  initializeExchangeRangeControls();
   const selectedMonthValue = els.monthFilter.value;
   const referenceMonthValue = els.referenceMonth.value;
   fillSelect(els.monthFilter, displayMonths().map((name, index) => ({ label: name, value: index })));
@@ -755,26 +780,101 @@ function changeExchangePair() {
   persist();
 }
 
-async function loadExchangeHistory() {
+function dateKey(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function subtractCalendarMonths(date, months) {
+  const result = new Date(date);
+  const desiredDay = result.getUTCDate();
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() - months);
+  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+  result.setUTCDate(Math.min(desiredDay, lastDay));
+  return result;
+}
+
+function getExchangeDateRange() {
   const today = new Date();
-  const todayKey = today.toISOString().slice(0, 10);
-  if (state.exchangeHistory?.fetchedOn === todayKey && state.exchangeHistory?.rates) {
+  const endDate = dateKey(today);
+
+  if (state.exchangePeriod === "custom" && state.exchangeCustomStart && state.exchangeCustomEnd) {
+    return { startDate: state.exchangeCustomStart, endDate: state.exchangeCustomEnd };
+  }
+
+  const monthsByPeriod = { "1m": 1, "3m": 3, "6m": 6 };
+  const start = state.exchangePeriod === "1y"
+    ? new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()))
+    : subtractCalendarMonths(today, monthsByPeriod[state.exchangePeriod] || 1);
+
+  return { startDate: dateKey(start), endDate };
+}
+
+function initializeExchangeRangeControls() {
+  const today = dateKey(new Date());
+  const defaultStart = dateKey(subtractCalendarMonths(new Date(), 1));
+  els.exchangeStartDate.max = today;
+  els.exchangeEndDate.max = today;
+  els.exchangeStartDate.value = state.exchangeCustomStart || defaultStart;
+  els.exchangeEndDate.value = state.exchangeCustomEnd || today;
+  els.exchangeCustomRange.hidden = state.exchangePeriod !== "custom";
+}
+
+async function changeExchangePeriod() {
+  state.exchangePeriod = els.exchangePeriod.value;
+  initializeExchangeRangeControls();
+  persist();
+
+  if (state.exchangePeriod !== "custom") {
+    await loadExchangeHistory();
+  }
+}
+
+async function searchCustomExchangeRange() {
+  const startDate = els.exchangeStartDate.value;
+  const endDate = els.exchangeEndDate.value;
+  const today = dateKey(new Date());
+
+  if (!startDate || !endDate || startDate > endDate || endDate > today) {
+    alert(ui("Escolha um período válido, sem datas futuras.", "Choose a valid period without future dates."));
+    return;
+  }
+
+  state.exchangeCustomStart = startDate;
+  state.exchangeCustomEnd = endDate;
+  state.exchangePeriod = "custom";
+  persist();
+  await loadExchangeHistory(true);
+}
+
+async function loadExchangeHistory(force = false) {
+  const todayKey = dateKey(new Date());
+  const { startDate, endDate } = getExchangeDateRange();
+  const rangeKey = `${startDate}:${endDate}`;
+
+  if (!force && state.exchangeHistory?.fetchedOn === todayKey && state.exchangeHistory?.rangeKey === rangeKey && state.exchangeHistory?.rates) {
     renderExchangeChart();
     return;
   }
 
-  const start = new Date(today);
-  start.setUTCDate(start.getUTCDate() - 30);
-  const startKey = start.toISOString().slice(0, 10);
-
   try {
-    const response = await fetch(`https://api.frankfurter.dev/v1/${startKey}..${todayKey}?from=EUR&to=BRL,USD`);
+    els.exchangeChart.innerHTML = `<div class="empty-state">${ui("Buscando histórico de cotações...", "Fetching exchange-rate history...")}</div>`;
+    const requestStart = new Date(`${startDate}T00:00:00Z`);
+    requestStart.setUTCDate(requestStart.getUTCDate() - 7);
+    const apiStartDate = dateKey(requestStart);
+    const response = await fetch(`https://api.frankfurter.dev/v1/${apiStartDate}..${endDate}?from=EUR&to=BRL,USD`);
     if (!response.ok) throw new Error("Histórico indisponível");
     const data = await response.json();
-    state.exchangeHistory = { fetchedOn: todayKey, rates: data.rates || {} };
+    state.exchangeHistory = { fetchedOn: todayKey, rangeKey, startDate, endDate, rates: data.rates || {} };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // Keep the most recently cached chart available while offline.
+    if (state.exchangeHistory?.rangeKey !== rangeKey) {
+      els.exchangeCurrent.textContent = "—";
+      els.exchangeMin.textContent = "—";
+      els.exchangeMax.textContent = "—";
+      els.exchangeChart.innerHTML = `<div class="empty-state">${ui("Não foi possível consultar este período. Verifique a conexão.", "This period could not be loaded. Check your connection.")}</div>`;
+      return;
+    }
   }
 
   renderExchangeChart();
@@ -790,12 +890,50 @@ function formatExchangeRate(value, target) {
   return `${Number(value).toLocaleString(state.language === "en" ? "en-IE" : "pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${target}`;
 }
 
+function expandExchangeHistory(history) {
+  const sourceRows = Object.entries(history)
+    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB));
+
+  if (!sourceRows.length) return [];
+
+  const snapshots = new Map(sourceRows);
+  const firstDate = sourceRows[0][0];
+  const lastDate = state.exchangeHistory?.endDate || state.exchangeHistory?.fetchedOn || sourceRows.at(-1)[0];
+  const start = new Date(`${firstDate}T00:00:00Z`);
+  const end = new Date(`${lastDate}T00:00:00Z`);
+  const rows = [];
+  let lastSnapshot = null;
+  let lastSourceDate = null;
+
+  for (const cursor = new Date(start); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const date = cursor.toISOString().slice(0, 10);
+    const publishedSnapshot = snapshots.get(date);
+
+    if (publishedSnapshot) {
+      lastSnapshot = publishedSnapshot;
+      lastSourceDate = date;
+    }
+
+    if (!lastSnapshot) continue;
+
+    rows.push({
+      date,
+      snapshot: lastSnapshot,
+      carried: !publishedSnapshot,
+      sourceDate: lastSourceDate,
+    });
+  }
+
+  return rows;
+}
+
 function renderExchangeChart() {
   const history = state.exchangeHistory?.rates || {};
   const [source, target] = (state.exchangePair || "EUR/BRL").split("/");
-  const rows = Object.entries(history)
-    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
-    .map(([date, snapshot]) => ({ date, value: exchangePairValue(snapshot, source, target) }))
+  const visibleStartDate = state.exchangeHistory?.startDate;
+  const rows = expandExchangeHistory(history)
+    .map((item) => ({ ...item, value: exchangePairValue(item.snapshot, source, target) }))
+    .filter((item) => !visibleStartDate || item.date >= visibleStartDate)
     .filter((item) => Number.isFinite(item.value));
 
   if (!rows.length) {
@@ -835,12 +973,19 @@ function renderExchangeChart() {
   }).join("");
   const labelIndexes = [...new Set([0, Math.floor((rows.length - 1) / 2), rows.length - 1])];
   const dateLabels = labelIndexes.map((index) => {
-    const label = new Date(`${rows[index].date}T00:00:00`).toLocaleDateString(state.language === "en" ? "en-IE" : "pt-BR", { day: "2-digit", month: "short" });
+    const includeYear = rows[0].date.slice(0, 4) !== rows.at(-1).date.slice(0, 4);
+    const label = new Date(`${rows[index].date}T00:00:00`).toLocaleDateString(state.language === "en" ? "en-IE" : "pt-BR", {
+      day: "2-digit",
+      month: "short",
+      ...(includeYear ? { year: "2-digit" } : {}),
+    });
     return `<text class="exchange-axis-label" x="${x(index)}" y="${height - 12}" text-anchor="middle">${label}</text>`;
   }).join("");
   const pointMarkers = rows.map((item, index) => {
-    const accessibleLabel = `${item.date}: ${formatExchangeRate(item.value, target)}`;
-    return `<circle class="exchange-point" cx="${x(index)}" cy="${y(item.value)}" r="3" tabindex="0" data-date="${item.date}" data-value="${item.value}" aria-label="${accessibleLabel}"></circle>`;
+    const marketStatus = item.carried ? ui("mercado fechado", "market closed") : ui("cotacao oficial", "official rate");
+    const accessibleLabel = `${item.date}: ${formatExchangeRate(item.value, target)}, ${marketStatus}`;
+    const radius = rows.length > 250 ? 1.7 : rows.length > 100 ? 2.2 : 3;
+    return `<circle class="exchange-point${item.carried ? " carried" : ""}" cx="${x(index)}" cy="${y(item.value)}" r="${radius}" tabindex="0" data-date="${item.date}" data-value="${item.value}" data-carried="${item.carried}" data-source-date="${item.sourceDate}" aria-label="${accessibleLabel}"></circle>`;
   }).join("");
 
   els.exchangeChart.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${source}/${target}">
@@ -873,7 +1018,11 @@ function bindExchangeChartInteractions(source, target) {
       month: "long",
       year: "numeric",
     });
-    tooltip.innerHTML = `<span>${source}/${target}</span><strong>${formatExchangeRate(Number(point.dataset.value), target)}</strong><small>${date}</small>`;
+    const sourceDate = new Date(`${point.dataset.sourceDate}T00:00:00`).toLocaleDateString(state.language === "en" ? "en-IE" : "pt-BR");
+    const marketStatus = point.dataset.carried === "true"
+      ? `<small class="market-status">${ui("Mercado fechado - cotacao de", "Market closed - rate from")} ${sourceDate}</small>`
+      : "";
+    tooltip.innerHTML = `<span>${source}/${target}</span><strong>${formatExchangeRate(Number(point.dataset.value), target)}</strong><small>${date}</small>${marketStatus}`;
 
     const chartRect = els.exchangeChart.getBoundingClientRect();
     const pointRect = point.getBoundingClientRect();
