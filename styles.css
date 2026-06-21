@@ -495,6 +495,95 @@ select:focus {
   color: var(--text);
 }
 
+.exchange-rate-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.exchange-rate-title {
+  align-items: end;
+  margin-bottom: 0;
+}
+
+.exchange-pair-field {
+  width: min(190px, 100%);
+}
+
+.exchange-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.exchange-stats > div {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.exchange-stats span,
+.exchange-stats strong {
+  display: block;
+}
+
+.exchange-stats span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.exchange-stats strong {
+  margin-top: 5px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.exchange-chart {
+  width: 100%;
+  min-height: 270px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--primary);
+}
+
+.exchange-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 270px;
+}
+
+.exchange-grid-line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.exchange-axis-label {
+  fill: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.exchange-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.exchange-point {
+  fill: var(--surface-2);
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
 .option-picker {
   display: grid;
   grid-template-columns: 1fr 44px 44px;
@@ -1096,6 +1185,10 @@ tbody tr:last-child td {
 
   .auth-actions button {
     width: 100%;
+  }
+
+  .exchange-stats {
+    grid-template-columns: 1fr;
   }
 }
 

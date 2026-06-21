@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=16" />
+    <link rel="stylesheet" href="./styles.css?v=17" />
   </head>
   <body>
     <main class="app-shell">
@@ -256,6 +256,29 @@
               </div>
             </div>
           </section>
+
+          <section class="panel exchange-rate-panel">
+            <div class="panel-title exchange-rate-title">
+              <h2>Gráfico Cotações Tempo Real</h2>
+              <label class="field exchange-pair-field">
+                <span>Par de moedas</span>
+                <select id="exchangePair">
+                  <option value="EUR/BRL">EUR/BRL</option>
+                  <option value="BRL/EUR">BRL/EUR</option>
+                  <option value="EUR/USD">EUR/USD</option>
+                  <option value="USD/EUR">USD/EUR</option>
+                  <option value="BRL/USD">BRL/USD</option>
+                  <option value="USD/BRL">USD/BRL</option>
+                </select>
+              </label>
+            </div>
+            <div class="exchange-stats">
+              <div><span>Atual</span><strong id="exchangeCurrent">—</strong></div>
+              <div><span>Mínima</span><strong id="exchangeMin">—</strong></div>
+              <div><span>Máxima</span><strong id="exchangeMax">—</strong></div>
+            </div>
+            <div id="exchangeChart" class="exchange-chart"></div>
+          </section>
         </section>
       </section>
 
@@ -352,6 +375,6 @@
       </div>
     </dialog>
 
-    <script src="./app.js?v=16"></script>
+    <script src="./app.js?v=17"></script>
   </body>
 </html>

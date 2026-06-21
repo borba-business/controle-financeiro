@@ -35,7 +35,8 @@ const STATIC_TRANSLATIONS = {
   "Limpar toda a planilha?": "Clear the entire spreadsheet?", "Cancelar": "Cancel", "Apagar lançamentos": "Delete entries",
   "Sincronização segura": "Secure synchronization", "Acessar seus dados": "Access your data", "E-mail": "Email", "Senha": "Password",
   "Criar conta": "Create account", "Entrar": "Sign in", "Conta conectada": "Connected account", "Sincronização pronta": "Sync ready",
-  "Sair": "Sign out", "Sincronizar agora": "Sync now", "Digite": "Type", "para confirmar": "to confirm",
+  "Sair": "Sign out", "Sincronizar agora": "Sync now", "Gráfico Cotações Tempo Real": "Real-Time Exchange Rate Chart",
+  "Par de moedas": "Currency pair", "Atual": "Current", "Mínima": "Low", "Máxima": "High", "Digite": "Type", "para confirmar": "to confirm",
   "Todos os lançamentos de receitas e despesas serão apagados permanentemente. Os cadastros e o nome da planilha serão mantidos.": "All income and expense entries will be permanently deleted. Records and the spreadsheet name will be kept."
 };
 
@@ -138,6 +139,11 @@ const els = {
   currency: document.querySelector("#currency"),
   amount: document.querySelector("#amount"),
   conversionPreview: document.querySelector("#conversionPreview"),
+  exchangePair: document.querySelector("#exchangePair"),
+  exchangeCurrent: document.querySelector("#exchangeCurrent"),
+  exchangeMin: document.querySelector("#exchangeMin"),
+  exchangeMax: document.querySelector("#exchangeMax"),
+  exchangeChart: document.querySelector("#exchangeChart"),
   notes: document.querySelector("#notes"),
   incomeSourceChart: document.querySelector("#incomeSourceChart"),
   incomeSourcesPanel: document.querySelector("#incomeSourcesPanel"),
@@ -194,6 +200,7 @@ function init() {
   els.languageSelect.value = state.language;
   els.baseCurrency.value = state.baseCurrency;
   els.currency.value = state.baseCurrency;
+  els.exchangePair.value = state.exchangePair;
   fillSelect(els.monthFilter, displayMonths().map((name, index) => ({ label: name, value: index })));
   fillYearFilter(new Date().getFullYear());
   fillSelect(els.referenceMonth, displayMonths().map((name, index) => ({ label: name, value: index })));
@@ -234,6 +241,7 @@ function bindEvents() {
   els.currency.addEventListener("change", updateConversionPreview);
   els.amount.addEventListener("input", updateConversionPreview);
   els.date.addEventListener("change", updateConversionPreview);
+  els.exchangePair.addEventListener("change", changeExchangePair);
   els.entryForm.addEventListener("submit", saveEntry);
   els.cancelEdit.addEventListener("click", clearForm);
   els.incomeSourceForm.addEventListener("submit", addGeneralRegistrationItem);
@@ -306,6 +314,8 @@ function loadState() {
       language: "pt",
       baseCurrency: "EUR",
       exchangeRatesCache: {},
+      exchangePair: "EUR/BRL",
+      exchangeHistory: null,
     };
   }
 
@@ -321,6 +331,8 @@ function loadState() {
       language: parsed.language === "en" ? "en" : "pt",
       baseCurrency: ["EUR", "BRL", "USD"].includes(parsed.baseCurrency) ? parsed.baseCurrency : "EUR",
       exchangeRatesCache: parsed.exchangeRatesCache && typeof parsed.exchangeRatesCache === "object" ? parsed.exchangeRatesCache : {},
+      exchangePair: typeof parsed.exchangePair === "string" ? parsed.exchangePair : "EUR/BRL",
+      exchangeHistory: parsed.exchangeHistory && typeof parsed.exchangeHistory === "object" ? parsed.exchangeHistory : null,
     };
   } catch {
     return {
@@ -333,6 +345,8 @@ function loadState() {
       language: "pt",
       baseCurrency: "EUR",
       exchangeRatesCache: {},
+      exchangePair: "EUR/BRL",
+      exchangeHistory: null,
     };
   }
 }
@@ -584,12 +598,15 @@ function applyRemoteState(remote) {
   state.language = remote.language === "en" ? "en" : state.language || "pt";
   state.baseCurrency = ["EUR", "BRL", "USD"].includes(remote.baseCurrency) ? remote.baseCurrency : state.baseCurrency || "EUR";
   state.exchangeRatesCache = remote.exchangeRatesCache && typeof remote.exchangeRatesCache === "object" ? remote.exchangeRatesCache : state.exchangeRatesCache || {};
+  state.exchangePair = typeof remote.exchangePair === "string" ? remote.exchangePair : state.exchangePair || "EUR/BRL";
+  state.exchangeHistory = remote.exchangeHistory && typeof remote.exchangeHistory === "object" ? remote.exchangeHistory : state.exchangeHistory || null;
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   fillSelect(els.incomeSource, state.incomeSources);
   fillSelect(els.account, state.accounts);
   els.languageSelect.value = state.language;
   els.baseCurrency.value = state.baseCurrency;
+  els.exchangePair.value = state.exchangePair;
   const selectedMonthValue = els.monthFilter.value;
   const referenceMonthValue = els.referenceMonth.value;
   fillSelect(els.monthFilter, displayMonths().map((name, index) => ({ label: name, value: index })));
@@ -727,8 +744,107 @@ async function initializeExchangeRates() {
   await getRatesForDate("latest");
   const dates = [...new Set(state.entries.filter((item) => !item.rates).map((item) => item.date).filter(Boolean))];
   await Promise.all(dates.map((date) => getRatesForDate(date)));
+  await loadExchangeHistory();
   render();
   updateConversionPreview();
+}
+
+function changeExchangePair() {
+  state.exchangePair = els.exchangePair.value;
+  renderExchangeChart();
+  persist();
+}
+
+async function loadExchangeHistory() {
+  const today = new Date();
+  const todayKey = today.toISOString().slice(0, 10);
+  if (state.exchangeHistory?.fetchedOn === todayKey && state.exchangeHistory?.rates) {
+    renderExchangeChart();
+    return;
+  }
+
+  const start = new Date(today);
+  start.setUTCDate(start.getUTCDate() - 30);
+  const startKey = start.toISOString().slice(0, 10);
+
+  try {
+    const response = await fetch(`https://api.frankfurter.dev/v1/${startKey}..${todayKey}?from=EUR&to=BRL,USD`);
+    if (!response.ok) throw new Error("Histórico indisponível");
+    const data = await response.json();
+    state.exchangeHistory = { fetchedOn: todayKey, rates: data.rates || {} };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Keep the most recently cached chart available while offline.
+  }
+
+  renderExchangeChart();
+}
+
+function exchangePairValue(snapshot, source, target) {
+  const rates = { EUR: 1, ...snapshot };
+  if (!rates[source] || !rates[target]) return null;
+  return rates[target] / rates[source];
+}
+
+function formatExchangeRate(value, target) {
+  return `${Number(value).toLocaleString(state.language === "en" ? "en-IE" : "pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${target}`;
+}
+
+function renderExchangeChart() {
+  const history = state.exchangeHistory?.rates || {};
+  const [source, target] = (state.exchangePair || "EUR/BRL").split("/");
+  const rows = Object.entries(history)
+    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+    .map(([date, snapshot]) => ({ date, value: exchangePairValue(snapshot, source, target) }))
+    .filter((item) => Number.isFinite(item.value));
+
+  if (!rows.length) {
+    els.exchangeCurrent.textContent = "—";
+    els.exchangeMin.textContent = "—";
+    els.exchangeMax.textContent = "—";
+    els.exchangeChart.innerHTML = `<div class="empty-state">${ui("Buscando histórico de cotações...", "Fetching exchange-rate history...")}</div>`;
+    return;
+  }
+
+  const values = rows.map((item) => item.value);
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const latest = rows.at(-1).value;
+  els.exchangeCurrent.textContent = formatExchangeRate(latest, target);
+  els.exchangeMin.textContent = formatExchangeRate(minimum, target);
+  els.exchangeMax.textContent = formatExchangeRate(maximum, target);
+
+  const width = 720;
+  const height = 270;
+  const padding = { top: 20, right: 18, bottom: 38, left: 62 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const range = maximum - minimum || Math.max(maximum * 0.01, 0.0001);
+  const chartMin = minimum - range * 0.12;
+  const chartMax = maximum + range * 0.12;
+  const chartRange = chartMax - chartMin;
+  const x = (index) => padding.left + (index / Math.max(rows.length - 1, 1)) * plotWidth;
+  const y = (value) => padding.top + ((chartMax - value) / chartRange) * plotHeight;
+  const points = rows.map((item, index) => `${x(index).toFixed(2)},${y(item.value).toFixed(2)}`).join(" ");
+  const grid = Array.from({ length: 5 }, (_, index) => {
+    const value = chartMax - (index / 4) * chartRange;
+    const lineY = padding.top + (index / 4) * plotHeight;
+    return `<line class="exchange-grid-line" x1="${padding.left}" y1="${lineY}" x2="${width - padding.right}" y2="${lineY}"></line>
+      <text class="exchange-axis-label" x="${padding.left - 8}" y="${lineY + 4}" text-anchor="end">${Number(value).toFixed(4)}</text>`;
+  }).join("");
+  const labelIndexes = [...new Set([0, Math.floor((rows.length - 1) / 2), rows.length - 1])];
+  const dateLabels = labelIndexes.map((index) => {
+    const label = new Date(`${rows[index].date}T00:00:00`).toLocaleDateString(state.language === "en" ? "en-IE" : "pt-BR", { day: "2-digit", month: "short" });
+    return `<text class="exchange-axis-label" x="${x(index)}" y="${height - 12}" text-anchor="middle">${label}</text>`;
+  }).join("");
+  const pointMarkers = rows.map((item, index) => `<circle class="exchange-point" cx="${x(index)}" cy="${y(item.value)}" r="3"><title>${item.date}: ${formatExchangeRate(item.value, target)}</title></circle>`).join("");
+
+  els.exchangeChart.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${source}/${target}">
+    ${grid}
+    ${dateLabels}
+    <polyline class="exchange-line" points="${points}"></polyline>
+    ${pointMarkers}
+  </svg>`;
 }
 
 function ratesForEntry(item) {
@@ -856,6 +972,7 @@ function render() {
   renderBarList(els.incomeSourceChart, groupValues(entries.filter((item) => item.type === "Receita"), "incomeSource"), "income");
   renderBarList(els.finalAccountBalanceChart, accountBalances());
   renderTable();
+  renderExchangeChart();
   applyStaticTranslations();
 }
 
