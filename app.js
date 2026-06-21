@@ -38,6 +38,8 @@ const STATIC_TRANSLATIONS = {
   "Sair": "Sign out", "Sincronizar agora": "Sync now", "Gráfico Cotações Tempo Real": "Real-Time Exchange Rate Chart",
   "Par de moedas": "Currency pair", "Período": "Period", "1 mês": "1 month", "3 meses": "3 months", "6 meses": "6 months", "1 ano": "1 year",
   "Personalizado": "Custom", "Data inicial": "Start date", "Data final": "End date", "Pesquisar": "Search",
+  "Visualização ampliada": "Expanded view", "Fechar gráfico": "Close chart",
+  "Arraste a barra horizontal para consultar outras datas.": "Drag the horizontal scrollbar to view other dates.",
   "Atual": "Current", "Mínima": "Low", "Máxima": "High", "Digite": "Type", "para confirmar": "to confirm",
   "Todos os lançamentos de receitas e despesas serão apagados permanentemente. Os cadastros e o nome da planilha serão mantidos.": "All income and expense entries will be permanently deleted. Records and the spreadsheet name will be kept."
 };
@@ -85,6 +87,7 @@ let syncTimer;
 let syncInProgress = false;
 let authReady = false;
 let conversionRequestId = 0;
+let exchangeChartMeta = { rowsCount: 0, source: "EUR", target: "BRL" };
 
 const els = {
   monthFilter: document.querySelector("#monthFilter"),
@@ -151,6 +154,10 @@ const els = {
   exchangeMin: document.querySelector("#exchangeMin"),
   exchangeMax: document.querySelector("#exchangeMax"),
   exchangeChart: document.querySelector("#exchangeChart"),
+  exchangeChartDialog: document.querySelector("#exchangeChartDialog"),
+  closeExchangeChartDialog: document.querySelector("#closeExchangeChartDialog"),
+  expandedExchangeChartScroll: document.querySelector("#expandedExchangeChartScroll"),
+  expandedExchangeChart: document.querySelector("#expandedExchangeChart"),
   notes: document.querySelector("#notes"),
   incomeSourceChart: document.querySelector("#incomeSourceChart"),
   incomeSourcesPanel: document.querySelector("#incomeSourcesPanel"),
@@ -253,6 +260,13 @@ function bindEvents() {
   els.exchangePair.addEventListener("change", changeExchangePair);
   els.exchangePeriod.addEventListener("change", changeExchangePeriod);
   els.searchExchangeRange.addEventListener("click", searchCustomExchangeRange);
+  els.exchangeChart.addEventListener("click", (event) => {
+    if (!event.target.closest(".exchange-point")) openExpandedExchangeChart();
+  });
+  els.closeExchangeChartDialog.addEventListener("click", () => els.exchangeChartDialog.close());
+  els.exchangeChartDialog.addEventListener("click", (event) => {
+    if (event.target === els.exchangeChartDialog) els.exchangeChartDialog.close();
+  });
   els.entryForm.addEventListener("submit", saveEntry);
   els.cancelEdit.addEventListener("click", clearForm);
   els.incomeSourceForm.addEventListener("submit", addGeneralRegistrationItem);
@@ -937,6 +951,7 @@ function renderExchangeChart() {
     .filter((item) => Number.isFinite(item.value));
 
   if (!rows.length) {
+    exchangeChartMeta = { rowsCount: 0, source, target };
     els.exchangeCurrent.textContent = "—";
     els.exchangeMin.textContent = "—";
     els.exchangeMax.textContent = "—";
@@ -945,6 +960,7 @@ function renderExchangeChart() {
   }
 
   const values = rows.map((item) => item.value);
+  exchangeChartMeta = { rowsCount: rows.length, source, target };
   const minimum = Math.min(...values);
   const maximum = Math.max(...values);
   const latest = rows.at(-1).value;
@@ -996,14 +1012,19 @@ function renderExchangeChart() {
     <polyline class="exchange-line" pathLength="1" points="${points}"></polyline>
     ${pointMarkers}
   </svg>
-  <div class="exchange-tooltip" role="status"></div>`;
-  bindExchangeChartInteractions(source, target);
+  <div class="exchange-tooltip" role="status"></div>
+  <button class="exchange-expand-button" type="button" aria-label="${ui("Expandir gráfico", "Expand chart")}" title="${ui("Expandir gráfico", "Expand chart")}">&#x26F6;</button>`;
+  bindExchangeChartInteractions(source, target, els.exchangeChart);
+  els.exchangeChart.querySelector(".exchange-expand-button").addEventListener("click", (event) => {
+    event.stopPropagation();
+    openExpandedExchangeChart();
+  });
 }
 
-function bindExchangeChartInteractions(source, target) {
-  const tooltip = els.exchangeChart.querySelector(".exchange-tooltip");
-  const guide = els.exchangeChart.querySelector(".exchange-hover-line");
-  const points = [...els.exchangeChart.querySelectorAll(".exchange-point")];
+function bindExchangeChartInteractions(source, target, chart = els.exchangeChart) {
+  const tooltip = chart.querySelector(".exchange-tooltip");
+  const guide = chart.querySelector(".exchange-hover-line");
+  const points = [...chart.querySelectorAll(".exchange-point")];
 
   const hideTooltip = () => {
     tooltip.classList.remove("visible");
@@ -1024,7 +1045,7 @@ function bindExchangeChartInteractions(source, target) {
       : "";
     tooltip.innerHTML = `<span>${source}/${target}</span><strong>${formatExchangeRate(Number(point.dataset.value), target)}</strong><small>${date}</small>${marketStatus}`;
 
-    const chartRect = els.exchangeChart.getBoundingClientRect();
+    const chartRect = chart.getBoundingClientRect();
     const pointRect = point.getBoundingClientRect();
     const pointX = pointRect.left + pointRect.width / 2 - chartRect.left;
     const pointY = pointRect.top + pointRect.height / 2 - chartRect.top;
@@ -1047,7 +1068,22 @@ function bindExchangeChartInteractions(source, target) {
     point.addEventListener("blur", hideTooltip);
   });
 
-  els.exchangeChart.querySelector("svg").addEventListener("pointerleave", hideTooltip);
+  chart.querySelector("svg").addEventListener("pointerleave", hideTooltip);
+}
+
+function openExpandedExchangeChart() {
+  const sourceSvg = els.exchangeChart.querySelector("svg");
+  if (!sourceSvg || exchangeChartMeta.rowsCount === 0 || els.exchangeChartDialog.open) return;
+
+  const chartWidth = Math.max(1100, exchangeChartMeta.rowsCount * 5);
+  els.expandedExchangeChart.style.width = `${chartWidth}px`;
+  els.expandedExchangeChart.innerHTML = `${sourceSvg.outerHTML}<div class="exchange-tooltip" role="status"></div>`;
+  bindExchangeChartInteractions(exchangeChartMeta.source, exchangeChartMeta.target, els.expandedExchangeChart);
+  els.exchangeChartDialog.showModal();
+
+  requestAnimationFrame(() => {
+    els.expandedExchangeChartScroll.scrollLeft = els.expandedExchangeChartScroll.scrollWidth - els.expandedExchangeChartScroll.clientWidth;
+  });
 }
 
 function ratesForEntry(item) {

@@ -1,9 +1,9 @@
-const CACHE_NAME = "controle-financeiro-v20";
+const CACHE_NAME = "controle-financeiro-v21";
 const APP_FILES = [
   "./",
   "./index.html",
-  "./styles.css?v=20",
-  "./app.js?v=20",
+  "./styles.css?v=21",
+  "./app.js?v=21",
   "./manifest.webmanifest",
   "./app-icon.svg",
   "./apple-touch-icon.png",

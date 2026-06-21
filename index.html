@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=20" />
+    <link rel="stylesheet" href="./styles.css?v=21" />
   </head>
   <body>
     <main class="app-shell">
@@ -339,6 +339,22 @@
       </section>
     </main>
 
+    <dialog id="exchangeChartDialog" class="exchange-chart-dialog" aria-labelledby="expandedExchangeChartTitle">
+      <div class="exchange-chart-dialog-content">
+        <div class="exchange-chart-dialog-header">
+          <div>
+            <p class="eyebrow">Visualização ampliada</p>
+            <h2 id="expandedExchangeChartTitle">Gráfico Cotações Tempo Real</h2>
+          </div>
+          <button id="closeExchangeChartDialog" class="icon-close" type="button" aria-label="Fechar gráfico" title="Fechar gráfico">&times;</button>
+        </div>
+        <p class="exchange-scroll-hint">Arraste a barra horizontal para consultar outras datas.</p>
+        <div id="expandedExchangeChartScroll" class="expanded-exchange-chart-scroll">
+          <div id="expandedExchangeChart" class="exchange-chart expanded-exchange-chart"></div>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="clearDataDialog" class="danger-dialog" aria-labelledby="clearDataTitle">
       <form id="clearDataForm" class="danger-dialog-content">
         <div class="danger-dialog-icon" aria-hidden="true">!</div>
@@ -398,6 +414,6 @@
       </div>
     </dialog>
 
-    <script src="./app.js?v=20"></script>
+    <script src="./app.js?v=21"></script>
   </body>
 </html>
