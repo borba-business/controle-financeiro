@@ -13,6 +13,40 @@ const MONTHS = [
   "Dezembro",
 ];
 
+const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+const STATIC_TRANSLATIONS = {
+  "Mês": "Month", "Ano": "Year", "Idioma": "Language", "Entrar e sincronizar": "Sign in and sync",
+  "Tema escuro": "Dark theme", "Exportar CSV": "Export CSV", "Restaurar": "Restore", "Limpar Planilha": "Clear Spreadsheet",
+  "Saldo inicial": "Starting balance", "Receitas": "Income", "Despesas": "Expenses", "Resultado": "Result",
+  "Saldo final": "Final balance", "Lançamentos": "Entries", "Ganhos e gastos": "Income and expenses",
+  "Comparativo do período": "Period comparison", "Visão mês a mês": "Month-by-month view", "Cadastros": "Records",
+  "Cancelar edição": "Cancel editing", "Novo lançamento": "New entry", "Cadastros Gerais": "General Records",
+  "Nome da planilha": "Spreadsheet name", "Data": "Date", "Referente ao mês": "Reference month", "Tipo": "Type",
+  "Receita": "Income", "Despesa": "Expense", "Origem da receita": "Income source", "Descrição": "Description",
+  "Categoria": "Category", "Forma de pagamento": "Payment method", "Conta": "Account", "Valor": "Amount",
+  "Observações": "Notes", "Salvar lançamento": "Save entry", "Origens Receita": "Income Sources", "Contas": "Accounts",
+  "Nova origem de receita": "New income source", "Adicionar": "Add", "Cópia completa": "Full copy",
+  "Backup e recuperação": "Backup and recovery", "Baixar backup": "Download backup", "Restaurar backup": "Restore backup",
+  "Análise Financeira": "Financial Analysis", "Visão geral": "Overview", "Pagamento": "Payment",
+  "Resumo de receitas": "Income summary", "Despesas por categoria": "Expenses by category", "Despesas por conta": "Expenses by account",
+  "Receitas por origem": "Income by source", "Saldo final por conta": "Final balance by account", "Histórico": "History",
+  "Buscar": "Search", "Todos": "All", "Referente": "Reference", "Forma": "Method", "Ação irreversível": "Irreversible action",
+  "Limpar toda a planilha?": "Clear the entire spreadsheet?", "Cancelar": "Cancel", "Apagar lançamentos": "Delete entries",
+  "Sincronização segura": "Secure synchronization", "Acessar seus dados": "Access your data", "E-mail": "Email", "Senha": "Password",
+  "Criar conta": "Create account", "Entrar": "Sign in", "Conta conectada": "Connected account", "Sincronização pronta": "Sync ready",
+  "Sair": "Sign out", "Sincronizar agora": "Sync now", "Digite": "Type", "para confirmar": "to confirm",
+  "Todos os lançamentos de receitas e despesas serão apagados permanentemente. Os cadastros e o nome da planilha serão mantidos.": "All income and expense entries will be permanently deleted. Records and the spreadsheet name will be kept."
+};
+
+const PLACEHOLDER_TRANSLATIONS = {
+  "Ex.: IPVA, UNIMED, mercado": "E.g.: tax, healthcare, groceries", "Opcional": "Optional", "Digite um nome": "Enter a name",
+  "Ex.: Mercado, aluguel, cliente": "E.g.: store, rent, client", "Descrição, categoria, conta...": "Description, category, account..."
+};
+
+let staticTextNodes = [];
+let staticPlaceholders = [];
+
 const DEFAULT_CATEGORIES = {
   Receita: ["Aposentadoria", "Aluguel", "Serviços", "Investimentos", "Outras receitas"],
   Despesa: ["Casa", "Saúde", "Mercado", "Transporte", "Impostos", "Lazer", "Outras despesas"],
@@ -51,6 +85,7 @@ let authReady = false;
 const els = {
   monthFilter: document.querySelector("#monthFilter"),
   yearFilter: document.querySelector("#yearFilter"),
+  languageSelect: document.querySelector("#languageSelect"),
   controlYearLabel: document.querySelector("#controlYearLabel"),
   ownerName: document.querySelector("#ownerName"),
   ownerNameHeading: document.querySelector("#ownerNameHeading"),
@@ -148,9 +183,11 @@ function entry(date, referenceMonth, type, incomeSource, description, category, 
 }
 
 function init() {
-  fillSelect(els.monthFilter, MONTHS.map((name, index) => ({ label: name, value: index })));
+  prepareStaticTranslations();
+  els.languageSelect.value = state.language;
+  fillSelect(els.monthFilter, displayMonths().map((name, index) => ({ label: name, value: index })));
   fillYearFilter(new Date().getFullYear());
-  fillSelect(els.referenceMonth, MONTHS.map((name, index) => ({ label: name, value: index })));
+  fillSelect(els.referenceMonth, displayMonths().map((name, index) => ({ label: name, value: index })));
   fillSelect(els.incomeSource, state.incomeSources);
   fillSelect(els.payment, DEFAULT_PAYMENTS);
   fillSelect(els.account, state.accounts);
@@ -172,12 +209,14 @@ function init() {
   bindEvents();
   renderRegistrationTabs();
   render();
+  applyStaticTranslations();
   initializeAuth();
 }
 
 function bindEvents() {
   els.monthFilter.addEventListener("change", render);
   els.yearFilter.addEventListener("change", render);
+  els.languageSelect.addEventListener("change", changeLanguage);
   els.ownerName.addEventListener("input", updateOwnerName);
   els.searchInput.addEventListener("input", renderTable);
   els.type.addEventListener("change", updateCategoryOptions);
@@ -250,6 +289,7 @@ function loadState() {
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       ownerName: DEFAULT_OWNER_NAME,
       theme: "light",
+      language: "pt",
     };
   }
 
@@ -262,6 +302,7 @@ function loadState() {
       categories: parsed.categories && typeof parsed.categories === "object" ? parsed.categories : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       ownerName: typeof parsed.ownerName === "string" && parsed.ownerName.trim() ? parsed.ownerName : DEFAULT_OWNER_NAME,
       theme: parsed.theme === "dark" ? "dark" : "light",
+      language: parsed.language === "en" ? "en" : "pt",
     };
   } catch {
     return {
@@ -271,6 +312,7 @@ function loadState() {
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       ownerName: DEFAULT_OWNER_NAME,
       theme: "light",
+      language: "pt",
     };
   }
 }
@@ -387,7 +429,7 @@ function updateAuthUi() {
   els.authForm.classList.toggle("hidden", connected);
   els.authAccount.classList.toggle("hidden", !connected);
   els.authButton.classList.toggle("connected", connected);
-  els.authButtonLabel.textContent = connected ? "Sincronizado" : "Entrar e sincronizar";
+  els.authButtonLabel.textContent = connected ? ui("Sincronizado", "Synced") : ui("Entrar e sincronizar", "Sign in and sync");
   els.authAccountEmail.textContent = authSession?.user?.email || "";
 }
 
@@ -401,8 +443,8 @@ function setSyncStatus(status, message) {
   if (status === "syncing") els.authButton.classList.add("syncing");
   if (status === "error") els.authButton.classList.add("sync-error");
   if (authSession?.user && status !== "error") els.authButton.classList.add("connected");
-  els.authButtonLabel.textContent = status === "syncing" ? "Sincronizando" : authSession?.user ? "Sincronizado" : "Entrar e sincronizar";
-  els.cloudSyncStatus.textContent = message || (status === "error" ? "Falha na sincronização" : "Dados sincronizados");
+  els.authButtonLabel.textContent = status === "syncing" ? ui("Sincronizando", "Syncing") : authSession?.user ? ui("Sincronizado", "Synced") : ui("Entrar e sincronizar", "Sign in and sync");
+  els.cloudSyncStatus.textContent = message || (status === "error" ? ui("Falha na sincronização", "Sync failed") : ui("Dados sincronizados", "Data synced"));
 }
 
 async function createAccount() {
@@ -476,7 +518,7 @@ async function syncNow() {
 async function syncToCloud() {
   if (syncInProgress || !authSession?.user) return;
   syncInProgress = true;
-  setSyncStatus("syncing", "Enviando alterações...");
+  setSyncStatus("syncing", ui("Enviando alterações...", "Sending changes..."));
 
   try {
     const session = await ensureSession();
@@ -490,7 +532,7 @@ async function syncToCloud() {
         updated_at: new Date().toISOString(),
       },
     });
-    setSyncStatus("success", `Sincronizado às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
+    setSyncStatus("success", `${ui("Sincronizado às", "Synced at")} ${new Date().toLocaleTimeString(state.language === "en" ? "en-GB" : "pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
   } catch (error) {
     setSyncStatus("error", friendlyAuthError(error));
   } finally {
@@ -501,12 +543,12 @@ async function syncToCloud() {
 async function loadRemoteState() {
   const session = await ensureSession();
   if (!session) return;
-  setSyncStatus("syncing", "Buscando seus dados...");
+  setSyncStatus("syncing", ui("Buscando seus dados...", "Fetching your data..."));
 
   const rows = await supabaseRequest(`/rest/v1/finance_states?select=state,updated_at&user_id=eq.${session.user.id}`);
   if (rows?.[0]?.state) {
     applyRemoteState(rows[0].state);
-    setSyncStatus("success", "Dados atualizados neste aparelho");
+    setSyncStatus("success", ui("Dados atualizados neste aparelho", "Data updated on this device"));
   } else {
     await syncToCloud();
   }
@@ -519,16 +561,25 @@ function applyRemoteState(remote) {
   state.categories = remote.categories && typeof remote.categories === "object" ? remote.categories : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
   state.ownerName = typeof remote.ownerName === "string" && remote.ownerName.trim() ? remote.ownerName : DEFAULT_OWNER_NAME;
   state.theme = remote.theme === "dark" ? "dark" : "light";
+  state.language = remote.language === "en" ? "en" : state.language || "pt";
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   fillSelect(els.incomeSource, state.incomeSources);
   fillSelect(els.account, state.accounts);
+  els.languageSelect.value = state.language;
+  const selectedMonthValue = els.monthFilter.value;
+  const referenceMonthValue = els.referenceMonth.value;
+  fillSelect(els.monthFilter, displayMonths().map((name, index) => ({ label: name, value: index })));
+  fillSelect(els.referenceMonth, displayMonths().map((name, index) => ({ label: name, value: index })));
+  els.monthFilter.value = selectedMonthValue;
+  els.referenceMonth.value = referenceMonthValue;
   updateCategoryOptions();
   els.ownerName.value = state.ownerName;
   els.ownerNameHeading.textContent = state.ownerName;
   document.title = "Planilha de Controle Financeiro";
   document.body.classList.toggle("dark", state.theme === "dark");
   updateThemeButton();
+  applyStaticTranslations();
   fillYearFilter(new Date().getFullYear());
   render();
 }
@@ -564,6 +615,57 @@ function fillSelect(select, values) {
 function normalizeIncomeSources(values) {
   const cleanValues = values.map((value) => String(value).trim()).filter(Boolean);
   return [...new Set([...cleanValues, "Não se aplica"])];
+}
+
+function ui(portuguese, english) {
+  return state.language === "en" ? english : portuguese;
+}
+
+function displayMonths() {
+  return state.language === "en" ? MONTHS_EN : MONTHS;
+}
+
+function prepareStaticTranslations() {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    const text = node.nodeValue.trim();
+    if (STATIC_TRANSLATIONS[text]) staticTextNodes.push({ node, pt: text, en: STATIC_TRANSLATIONS[text] });
+  }
+
+  document.querySelectorAll("[placeholder]").forEach((element) => {
+    const placeholder = element.getAttribute("placeholder");
+    if (PLACEHOLDER_TRANSLATIONS[placeholder]) {
+      staticPlaceholders.push({ element, pt: placeholder, en: PLACEHOLDER_TRANSLATIONS[placeholder] });
+    }
+  });
+}
+
+function applyStaticTranslations() {
+  document.documentElement.lang = state.language === "en" ? "en" : "pt-BR";
+  staticTextNodes.forEach(({ node, pt, en }) => {
+    if (!node.isConnected) return;
+    const whitespaceStart = node.nodeValue.match(/^\s*/)?.[0] || "";
+    const whitespaceEnd = node.nodeValue.match(/\s*$/)?.[0] || "";
+    node.nodeValue = `${whitespaceStart}${ui(pt, en)}${whitespaceEnd}`;
+  });
+  staticPlaceholders.forEach(({ element, pt, en }) => element.setAttribute("placeholder", ui(pt, en)));
+}
+
+function changeLanguage() {
+  const month = els.monthFilter.value;
+  const referenceMonth = els.referenceMonth.value;
+  state.language = els.languageSelect.value === "en" ? "en" : "pt";
+  fillSelect(els.monthFilter, displayMonths().map((name, index) => ({ label: name, value: index })));
+  fillSelect(els.referenceMonth, displayMonths().map((name, index) => ({ label: name, value: index })));
+  els.monthFilter.value = month;
+  els.referenceMonth.value = referenceMonth;
+  applyStaticTranslations();
+  updateThemeButton();
+  updateAuthUi();
+  renderGeneralRegistrations();
+  render();
+  persist();
 }
 
 function currentCategoryOptions() {
@@ -626,8 +728,8 @@ function render() {
   const balance = income - expense;
   const endingBalance = startingBalance + balance;
 
-  els.controlYearLabel.textContent = `Controle financeiro ${year}`;
-  els.selectedMonthLabel.textContent = `${MONTHS[month]} ${year}`;
+  els.controlYearLabel.textContent = `${ui("Controle financeiro", "Financial control")} ${year}`;
+  els.selectedMonthLabel.textContent = `${displayMonths()[month]} ${year}`;
   els.startingBalanceTotal.textContent = money(startingBalance);
   els.incomeTotal.textContent = money(income);
   els.expenseTotal.textContent = money(expense);
@@ -643,6 +745,7 @@ function render() {
   renderBarList(els.incomeSourceChart, groupValues(entries.filter((item) => item.type === "Receita"), "incomeSource"), "income");
   renderBarList(els.finalAccountBalanceChart, accountBalances());
   renderTable();
+  applyStaticTranslations();
 }
 
 function calculateStartingBalance(month, year) {
@@ -665,9 +768,9 @@ function money(value) {
 function renderCashflow(income, expense, balance) {
   const max = Math.max(income, expense, Math.abs(balance), 1);
   const rows = [
-    ["Receitas", income, "income"],
-    ["Despesas", expense, "expense"],
-    ["Resultado", balance, "accent"],
+    [ui("Receitas", "Income"), income, "income"],
+    [ui("Despesas", "Expenses"), expense, "expense"],
+    [ui("Resultado", "Result"), balance, "accent"],
   ];
 
   els.cashflowChart.innerHTML = rows
@@ -684,7 +787,8 @@ function renderCashflow(income, expense, balance) {
 }
 
 function renderMonthlyChart() {
-  const monthly = MONTHS.map((_, month) => {
+  const months = displayMonths();
+  const monthly = months.map((_, month) => {
     const entries = monthEntries(month, selectedYear());
     return {
       income: sum(entries.filter((item) => item.type === "Receita")),
@@ -698,12 +802,12 @@ function renderMonthlyChart() {
       const incomeHeight = Math.max(4, (item.income / max) * 100);
       const expenseHeight = Math.max(4, (item.expense / max) * 100);
       return `
-        <div class="month-column" title="${MONTHS[index]}">
+        <div class="month-column" title="${months[index]}">
           <div class="month-bars">
             <span class="fill income" style="height:${incomeHeight}%"></span>
             <span class="fill expense" style="height:${expenseHeight}%"></span>
           </div>
-          <small>${MONTHS[index].slice(0, 3)}</small>
+          <small>${months[index].slice(0, 3)}</small>
         </div>
       `;
     })
@@ -712,7 +816,7 @@ function renderMonthlyChart() {
 
 function groupValues(entries, key) {
   return entries.reduce((groups, item) => {
-    const label = item[key] || "Sem informação";
+    const label = item[key] || ui("Sem informação", "No information");
     groups[label] = (groups[label] || 0) + Number(item.amount || 0);
     return groups;
   }, {});
@@ -735,7 +839,7 @@ function renderBarList(container, groups, forceColorClass = null) {
   const max = Math.max(...rows.map(([, value]) => Math.abs(value)), 1);
 
   if (!rows.length) {
-    container.innerHTML = `<div class="empty-state">Sem dados para exibir.</div>`;
+    container.innerHTML = `<div class="empty-state">${ui("Sem dados para exibir.", "No data to display.")}</div>`;
     return;
   }
 
@@ -764,7 +868,7 @@ function renderTable() {
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   if (!entries.length) {
-    els.entriesTable.innerHTML = `<tr><td colspan="9"><div class="empty-state">Nenhum lançamento encontrado.</div></td></tr>`;
+    els.entriesTable.innerHTML = `<tr><td colspan="9"><div class="empty-state">${ui("Nenhum lançamento encontrado.", "No entries found.")}</div></td></tr>`;
     return;
   }
 
@@ -773,8 +877,8 @@ function renderTable() {
       (item) => `
         <tr>
           <td>${formatDate(item.date)}</td>
-          <td>${MONTHS[item.referenceMonth]} ${entryYear(item)}</td>
-          <td><span class="pill ${item.type === "Receita" ? "income" : "expense"}">${item.type}</span></td>
+          <td>${displayMonths()[item.referenceMonth]} ${entryYear(item)}</td>
+          <td><span class="pill ${item.type === "Receita" ? "income" : "expense"}">${item.type === "Receita" ? ui("Receita", "Income") : ui("Despesa", "Expense")}</span></td>
           <td><strong>${escapeHtml(item.description)}</strong><br><small>${escapeHtml(item.notes || "")}</small></td>
           <td>${escapeHtml(item.category)}</td>
           <td>${escapeHtml(item.payment)}</td>
@@ -782,8 +886,8 @@ function renderTable() {
           <td><strong>${money(item.amount)}</strong></td>
           <td>
             <div class="row-actions">
-              <button type="button" data-action="edit" data-id="${item.id}">Editar</button>
-              <button type="button" data-action="delete" data-id="${item.id}">Excluir</button>
+              <button type="button" data-action="edit" data-id="${item.id}">${ui("Editar", "Edit")}</button>
+              <button type="button" data-action="delete" data-id="${item.id}">${ui("Excluir", "Delete")}</button>
             </div>
           </td>
         </tr>
@@ -859,7 +963,7 @@ function editEntry(id) {
 function deleteEntry(id) {
   const item = state.entries.find((entryItem) => entryItem.id === id);
   if (!item) return;
-  if (!confirm(`Excluir "${item.description}"?`)) return;
+  if (!confirm(`${ui("Excluir", "Delete")} "${item.description}"?`)) return;
   state.entries = state.entries.filter((entryItem) => entryItem.id !== id);
   persist();
   render();
@@ -876,30 +980,30 @@ function ensureCategoryOption(category) {
 function generalRegistrationConfig() {
   if (activeSubRegistrationTab === "categories") {
     return {
-      label: "Nova categoria",
-      placeholder: "Ex.: Educação, Saúde, Mercado",
+      label: ui("Nova categoria", "New category"),
+      placeholder: ui("Ex.: Educação, Saúde, Mercado", "E.g.: Education, Health, Groceries"),
       items: currentCategoryOptions(),
-      duplicateMessage: "Esta categoria já está cadastrada.",
-      removeMessage: "categorias",
+      duplicateMessage: ui("Esta categoria já está cadastrada.", "This category is already registered."),
+      removeMessage: ui("categorias", "categories"),
     };
   }
 
   if (activeSubRegistrationTab === "accounts") {
     return {
-      label: "Nova conta",
-      placeholder: "Ex.: Carteira, Banco, Poupança",
+      label: ui("Nova conta", "New account"),
+      placeholder: ui("Ex.: Carteira, Banco, Poupança", "E.g.: Wallet, Bank, Savings"),
       items: state.accounts,
-      duplicateMessage: "Esta conta já está cadastrada.",
-      removeMessage: "contas",
+      duplicateMessage: ui("Esta conta já está cadastrada.", "This account is already registered."),
+      removeMessage: ui("contas", "accounts"),
     };
   }
 
   return {
-    label: "Nova origem de receita",
-    placeholder: "Ex.: Mercado, aluguel, cliente",
+    label: ui("Nova origem de receita", "New income source"),
+    placeholder: ui("Ex.: Mercado, aluguel, cliente", "E.g.: Store, rent, client"),
     items: state.incomeSources,
-    duplicateMessage: "Esta origem já está cadastrada.",
-    removeMessage: "origens de receita",
+    duplicateMessage: ui("Esta origem já está cadastrada.", "This income source is already registered."),
+    removeMessage: ui("origens de receita", "income sources"),
   };
 }
 
@@ -938,12 +1042,12 @@ function removeGeneralRegistrationItem(event) {
   if (!button) return;
   const selectedItem = button.dataset.generalItem;
   if (!selectedItem || (activeSubRegistrationTab === "incomeSources" && selectedItem === "Não se aplica")) {
-    alert('A opção "Não se aplica" é fixa e não pode ser removida.');
+    alert(ui('A opção "Não se aplica" é fixa e não pode ser removida.', 'The "Not applicable" option is fixed and cannot be removed.'));
     return;
   }
 
   const config = generalRegistrationConfig();
-  if (!confirm(`Remover "${selectedItem}" da lista de ${config.removeMessage}? Os históricos já cadastrados continuarão salvos.`)) return;
+  if (!confirm(`${ui("Remover", "Remove")} "${selectedItem}" ${ui("da lista de", "from the list of")} ${config.removeMessage}? ${ui("Os históricos já cadastrados continuarão salvos.", "Existing history will remain saved.")}`)) return;
 
   if (activeSubRegistrationTab === "categories") {
     state.categories.Despesa = state.categories.Despesa.filter((item) => item !== selectedItem);
@@ -978,7 +1082,7 @@ function toggleTheme() {
 
 function updateThemeButton() {
   const isDark = state.theme === "dark";
-  els.themeToggle.textContent = isDark ? "Tema claro" : "Tema escuro";
+  els.themeToggle.textContent = isDark ? ui("Tema claro", "Light theme") : ui("Tema escuro", "Dark theme");
   els.themeToggle.setAttribute("aria-pressed", String(isDark));
 }
 
@@ -1013,7 +1117,7 @@ function renderGeneralRegistrations() {
     .map((item) => {
       const isFixed = activeSubRegistrationTab === "incomeSources" && item === "Não se aplica";
       const deleteButton = isFixed
-        ? `<span class="fixed-label">Fixo</span>`
+        ? `<span class="fixed-label">${ui("Fixo", "Fixed")}</span>`
         : `<button class="icon-danger" type="button" data-general-item="${escapeHtml(item)}" aria-label="Remover ${escapeHtml(item)}">🗑</button>`;
       return `
         <div class="editable-list-row">
@@ -1026,10 +1130,12 @@ function renderGeneralRegistrations() {
 }
 
 function exportCsv() {
-  const headers = ["Data", "Referente", "Tipo", "Origem", "Descrição", "Categoria", "Forma", "Conta", "Valor", "Observações"];
+  const headers = state.language === "en"
+    ? ["Date", "Reference", "Type", "Source", "Description", "Category", "Method", "Account", "Amount", "Notes"]
+    : ["Data", "Referente", "Tipo", "Origem", "Descrição", "Categoria", "Forma", "Conta", "Valor", "Observações"];
   const rows = state.entries.map((item) => [
     item.date,
-    MONTHS[item.referenceMonth],
+    displayMonths()[item.referenceMonth],
     item.type,
     item.incomeSource,
     item.description,
@@ -1142,7 +1248,7 @@ function defaultDateForSelection() {
 }
 
 function formatDate(value) {
-  return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
+  return new Date(`${value}T00:00:00`).toLocaleDateString(state.language === "en" ? "en-GB" : "pt-BR");
 }
 
 function csvValue(value) {

@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=13" />
+    <link rel="stylesheet" href="./styles.css?v=14" />
   </head>
   <body>
     <main class="app-shell">
@@ -33,6 +33,13 @@
           <label class="field compact">
             <span>Ano</span>
             <select id="yearFilter"></select>
+          </label>
+          <label class="field compact language-field">
+            <span>Idioma</span>
+            <select id="languageSelect" aria-label="Selecionar idioma">
+              <option value="pt">Português</option>
+              <option value="en">English</option>
+            </select>
           </label>
           <button id="authButton" class="secondary sync-button" type="button">
             <span id="syncIndicator" class="sync-indicator" aria-hidden="true"></span>
@@ -328,6 +335,6 @@
       </div>
     </dialog>
 
-    <script src="./app.js?v=13"></script>
+    <script src="./app.js?v=14"></script>
   </body>
 </html>
