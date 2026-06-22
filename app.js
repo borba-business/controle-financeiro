@@ -145,6 +145,8 @@ const els = {
   utilityMenu: document.querySelector("#utilityMenu"),
   utilityMenuClose: document.querySelector("#utilityMenuClose"),
   utilityMenuBackdrop: document.querySelector("#utilityMenuBackdrop"),
+  marketTicker: document.querySelector("#marketTicker"),
+  marketTickerTrack: document.querySelector("#marketTickerTrack"),
   openBackupPanel: document.querySelector("#openBackupPanel"),
   backupDialog: document.querySelector("#backupDialog"),
   closeBackupDialog: document.querySelector("#closeBackupDialog"),
@@ -472,6 +474,7 @@ function bindEvents() {
   els.amount.addEventListener("input", updateConversionPreview);
   els.date.addEventListener("change", updateConversionPreview);
   els.exchangePair.addEventListener("change", changeExchangePair);
+  els.marketTickerTrack.addEventListener("click", selectTickerPair);
   els.exchangePeriod.addEventListener("change", changeExchangePeriod);
   els.searchExchangeRange.addEventListener("click", searchCustomExchangeRange);
   els.exchangeChart.addEventListener("click", (event) => {
@@ -1748,6 +1751,61 @@ function changeExchangePair() {
   persist();
 }
 
+function selectTickerPair(event) {
+  const item = event.target.closest("[data-market-pair]");
+  if (!item) return;
+  const pair = item.dataset.marketPair;
+  if (![...els.exchangePair.options].some((option) => option.value === pair)) return;
+
+  state.exchangePair = pair;
+  els.exchangePair.value = pair;
+  renderExchangeChart();
+  persist();
+  document.querySelector('[data-module-id="exchange"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function renderMarketTicker() {
+  const history = state.exchangeHistory?.rates || {};
+  const rows = Object.entries(history)
+    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+    .filter(([, snapshot]) => snapshot && Number(snapshot.BRL) && Number(snapshot.USD));
+
+  if (rows.length < 2) {
+    els.marketTickerTrack.innerHTML = `<span class="market-ticker-loading">${ui("Consultando cotações do mercado...", "Loading market rates...")}</span>`;
+    return;
+  }
+
+  const [, previousSnapshot] = rows.at(-2);
+  const [latestDate, latestSnapshot] = rows.at(-1);
+  const pairSet = ["EUR/BRL", "BRL/EUR", "EUR/USD", "USD/EUR", "BRL/USD", "USD/BRL"];
+  const pairs = [...pairSet, ...pairSet];
+  const locale = state.language === "en" ? "en-IE" : "pt-BR";
+  const formattedDate = new Date(`${latestDate}T00:00:00`).toLocaleDateString(locale, { day: "2-digit", month: "2-digit" });
+
+  const items = pairs.map((pair) => {
+    const [source, target] = pair.split("/");
+    const current = exchangePairValue(latestSnapshot, source, target);
+    const previous = exchangePairValue(previousSnapshot, source, target);
+    const change = previous ? ((current - previous) / previous) * 100 : 0;
+    const direction = change > 0.0001 ? "up" : change < -0.0001 ? "down" : "neutral";
+    const arrow = direction === "up" ? "▲" : direction === "down" ? "▼" : "•";
+    const signedChange = `${change > 0 ? "+" : ""}${change.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+    const value = current.toLocaleString(locale, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    const label = `${pair}, ${value}, ${signedChange}, ${ui("cotação de", "rate from")} ${formattedDate}`;
+    return `<button class="market-ticker-item" type="button" role="listitem" data-market-pair="${pair}" aria-label="${label}" title="${ui("Abrir gráfico", "Open chart")} ${pair}">
+      <span class="market-ticker-pair">${pair}</span>
+      <span class="market-ticker-value">${value}</span>
+      <span class="market-ticker-change ${direction}">${arrow} ${signedChange}</span>
+      <span class="market-ticker-date">${formattedDate}</span>
+    </button>`;
+  }).join("");
+
+  const group = `<div class="market-ticker-group" role="list">${items}</div>`;
+  const duplicateItems = items.replaceAll("<button ", '<button tabindex="-1" ');
+  els.marketTickerTrack.innerHTML = `${group}<div class="market-ticker-group" aria-hidden="true">${duplicateItems}</div>`;
+  els.marketTicker.title = `${ui("Última cotação oficial", "Latest official rate")}: ${formattedDate}. ${ui("Clique em um par para abrir o gráfico.", "Select a pair to open its chart.")}`;
+}
+
 function dateKey(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -2318,6 +2376,7 @@ function render() {
   renderBarList(els.finalAccountBalanceChart, accountBalances());
   renderTable();
   renderExchangeChart();
+  renderMarketTicker();
   applyStaticTranslations();
 }
 
