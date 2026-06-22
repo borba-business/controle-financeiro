@@ -16,14 +16,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=38" />
+    <link rel="stylesheet" href="./styles.css?v=39" />
   </head>
   <body>
     <main class="app-shell">
       <section class="topbar">
         <div>
           <p id="controlYearLabel" class="eyebrow">Controle financeiro 2026</p>
-          <h1 id="ownerNameHeading">Lurdes Camargo</h1>
+          <h1 id="ownerNameHeading">Minha Planilha</h1>
         </div>
         <div class="top-actions">
           <label class="field compact">
@@ -150,7 +150,7 @@
               </div>
               <label class="field wide">
                 <span>Descrição</span>
-                <input id="description" type="text" placeholder="Ex.: IPVA, UNIMED, mercado" required />
+                <input id="description" type="text" placeholder="Ex.: IPVA, Saude, Mercado, Aluguel, etc." required />
               </label>
               <div class="field">
                 <span>Categoria</span>
@@ -191,7 +191,7 @@
             <section id="nameSheetPanel" class="registration-tab-panel name-sheet-panel hidden">
               <label class="field owner-field">
                 <span>Nome da planilha</span>
-                <input id="ownerName" type="text" value="Lurdes Camargo" placeholder="Digite um nome" />
+                <input id="ownerName" type="text" value="Minha Planilha" placeholder="Digite um nome" />
               </label>
             </section>
 
@@ -206,7 +206,7 @@
               <form id="incomeSourceForm" class="inline-create-form">
                 <label class="field">
                   <span id="subFormLabel">Nova origem de receita</span>
-                  <input id="newIncomeSource" type="text" placeholder="Ex.: Mercado, aluguel, cliente" required />
+                  <input id="newIncomeSource" type="text" placeholder="Ex.: Mercado, Aluguel, Cliente, etc." required />
                 </label>
                 <button class="primary" type="submit">Adicionar</button>
               </form>
@@ -494,6 +494,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=38"></script>
+    <script src="./app.js?v=39"></script>
   </body>
 </html>

@@ -67,14 +67,13 @@ let staticTextNodes = [];
 let staticPlaceholders = [];
 
 const DEFAULT_CATEGORIES = {
-  Receita: ["Aposentadoria", "Aluguel", "Serviços", "Investimentos", "Outras receitas"],
-  Despesa: ["Casa", "Saúde", "Mercado", "Transporte", "Impostos", "Lazer", "Outras despesas"],
+  Receita: [],
+  Despesa: [],
 };
 
-const DEFAULT_PAYMENTS = ["Pix", "Débito", "Crédito", "Dinheiro", "Boleto", "Transferência"];
-const DEFAULT_INCOME_SOURCES = ["Lurdes", "Camargo", "Família", "Banco", "Outro", "Não se aplica"];
-const DEFAULT_ACCOUNTS = ["Carteira", "Conta corrente", "Poupança", "Cartão", "Investimentos"];
-const DEFAULT_OWNER_NAME = "Lurdes Camargo";
+const DEFAULT_PAYMENTS = [];
+const DEFAULT_INCOME_SOURCES = ["Não se aplica"];
+const DEFAULT_ACCOUNTS = [];
 const NEW_USER_OWNER_NAME = "Minha Planilha";
 const DEFAULT_MODULE_ORDER = ["dashboard", "registrations", "analysis", "exchange", "history"];
 const DEFAULT_MODULE_SIZES = {
@@ -84,7 +83,7 @@ const DEFAULT_MODULE_SIZES = {
   exchange: "half",
   history: "full",
 };
-const STORAGE_KEY = "lurdes-controle-financeiro-v1";
+const STORAGE_KEY = "controle-financeiro-v1";
 const AUTH_STORAGE_KEY = "controle-financeiro-auth-v1";
 const SUPABASE_URL = "https://uxioksvzpcogcuplfrdj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_0Rglw4_AS_h3B7IZaqN2GA_0Gic3UnW";
@@ -93,6 +92,7 @@ const PDFJS_MODULE_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/
 const PDFJS_WORKER_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
 
 let authSession = loadAuthSession();
+migrateLegacyAccountStorage(authSession?.user?.id);
 let activeStorageKey = authSession?.user?.id ? accountStorageKey(authSession.user.id) : STORAGE_KEY;
 const state = loadState(activeStorageKey);
 let activeHistoryFilter = "all";
@@ -924,6 +924,18 @@ function accountStorageKey(userId) {
   return `${STORAGE_KEY}:user:${userId}`;
 }
 
+function migrateLegacyAccountStorage(userId) {
+  if (!userId) return;
+  const currentKey = accountStorageKey(userId);
+  if (localStorage.getItem(currentKey) !== null) return;
+
+  const accountSuffix = `controle-financeiro-v1:user:${userId}`;
+  const legacyKey = Object.keys(localStorage).find((key) => key !== currentKey && key.endsWith(accountSuffix));
+  if (!legacyKey) return;
+  const legacyState = localStorage.getItem(legacyKey);
+  if (legacyState !== null) localStorage.setItem(currentKey, legacyState);
+}
+
 function loadState(storageKey = activeStorageKey) {
   const saved = storageKey === STORAGE_KEY ? null : localStorage.getItem(storageKey);
   if (!saved) {
@@ -1003,6 +1015,7 @@ function saveLocalState() {
 
 function activateAccountStorage(userId) {
   if (!userId) return;
+  migrateLegacyAccountStorage(userId);
   activeStorageKey = accountStorageKey(userId);
   applyRemoteState(loadState(activeStorageKey));
   clearForm();
@@ -1317,7 +1330,7 @@ function friendlyAuthError(error) {
 }
 
 function updateOwnerName() {
-  const cleanName = els.ownerName.value.trim() || DEFAULT_OWNER_NAME;
+  const cleanName = els.ownerName.value.trim() || NEW_USER_OWNER_NAME;
   state.ownerName = cleanName;
   els.ownerNameHeading.textContent = cleanName;
   document.title = "Planilha de Controle Financeiro";
@@ -2512,7 +2525,7 @@ function exportCsv() {
   const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "controle-financeiro-lurdes-camargo.csv";
+  link.download = `controle-financeiro-${new Date().toISOString().slice(0, 10)}.csv`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
