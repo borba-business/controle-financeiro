@@ -967,8 +967,9 @@ function extractReceiptReference(lines) {
       if (/^(juros|desconto|pago via|paid via|conta|account|banco|bank)\b/.test(normalizedCandidateLine)) break;
       const candidate = candidateLine.replace(/\s+/g, "").replace(/[^A-Za-z0-9._/-]/g, "");
       if (!/^[A-Za-z0-9._/-]{6,}$/.test(candidate)) break;
-      if (/\s/.test(candidateLine) && candidate.length < 16) break;
+      if (/\s/.test(candidateLine) && !/^[A-Fa-f0-9]{16,}$/.test(candidate)) break;
       parts.push(candidate);
+      if (/^[A-Z]{2}\d{10,}$/i.test(parts.join(""))) break;
     }
 
     const reference = parts.join("").replace(/[^A-Za-z0-9._/-]/g, "").slice(0, 220);
@@ -1026,7 +1027,11 @@ function extractReceiptFields(text, ocrConfidence) {
   const amount = extractReceiptAmount(lines, text);
   const date = extractReceiptDate(text);
   const receiptReference = extractReceiptReference(lines);
-  const currency = /\bBRL\b|R\$/i.test(text) ? "BRL" : (/\bUSD\b|US\$|\$/i.test(text) ? "USD" : (/\bEUR\b|€/i.test(text) ? "EUR" : state.baseCurrency));
+  const currency = /\bBRL\b|R\$/i.test(text)
+    ? "BRL"
+    : (/\bEUR\b|€/i.test(text)
+      ? "EUR"
+      : (/\bUSD\b|US\$/i.test(text) ? "USD" : state.baseCurrency));
   const category = findReceiptOption(`${description} ${text}`, currentCategoryOptions());
   let payment = findReceiptOption(text, state.payments);
   if (!payment && /\b(iban|bic|bank transfer|transferencia|transferência)\b/i.test(text)) {
