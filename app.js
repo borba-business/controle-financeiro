@@ -53,6 +53,8 @@ Object.assign(STATIC_TRANSLATIONS, {
   "Selecionar comprovante": "Select receipt",
   "Leitura local": "Local reading",
   "Confira os dados encontrados": "Review the extracted data",
+  "Autenticação / referência": "Authentication / reference",
+  "Sugestão": "Suggestion",
   "Usar estes dados": "Use this data",
   "O comprovante já foi descartado. Somente estes dados serão usados para preencher o formulário.": "The receipt has already been discarded. Only this data will be used to fill in the form.",
   "Fotografe ou selecione uma imagem ou PDF. A leitura é feita neste aparelho, sem enviar o arquivo.": "Take a photo or select an image or PDF. Reading happens on this device without uploading the file.",
@@ -184,6 +186,7 @@ const els = {
   account: document.querySelector("#account"),
   currency: document.querySelector("#currency"),
   amount: document.querySelector("#amount"),
+  receiptReference: document.querySelector("#receiptReference"),
   conversionPreview: document.querySelector("#conversionPreview"),
   exchangeChartTitle: document.querySelector("#exchangeChartTitle"),
   exchangePair: document.querySelector("#exchangePair"),
@@ -798,6 +801,77 @@ function cleanReceiptDescription(value) {
   return String(value || "").replace(/^[*#:\-\s]+/, "").replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
+function extractReceiptReference(lines) {
+  const labels = [
+    "autenticação", "autenticacao", "código de autenticação", "codigo de autenticacao",
+    "referência", "referencia", "payment reference", "transaction id",
+    "id da transação", "id da transacao", "end-to-end id", "e2e id", "protocolo",
+  ];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const normalizedLine = normalizedValue(line);
+    const label = labels.find((candidate) => {
+      const normalizedLabel = normalizedValue(candidate);
+      return normalizedLine === normalizedLabel || normalizedLine.startsWith(`${normalizedLabel}:`) || normalizedLine.startsWith(`${normalizedLabel} `);
+    });
+    if (!label) continue;
+
+    const normalizedLabel = normalizedValue(label);
+    const labelWords = normalizedLabel.split(/\s+/).length;
+    const inlineValue = line.replace(/^.*?:/, "").trim() === line.trim()
+      ? line.split(/\s+/).slice(labelWords).join("").trim()
+      : line.replace(/^.*?:/, "").replace(/\s+/g, "").trim();
+    const parts = inlineValue ? [inlineValue] : [];
+
+    for (let offset = 1; offset <= 3 && index + offset < lines.length; offset += 1) {
+      const candidateLine = lines[index + offset].trim();
+      if (/\s/.test(candidateLine)) break;
+      const candidate = candidateLine.replace(/\s+/g, "");
+      if (!/^[A-Za-z0-9._/-]{6,}$/.test(candidate)) break;
+      parts.push(candidate);
+    }
+
+    const reference = parts.join("").replace(/[^A-Za-z0-9._/-]/g, "").slice(0, 220);
+    if (reference.length >= 6) return reference;
+  }
+  return "";
+}
+
+function receiptFieldSuggestions(lines, text, type) {
+  const normalizedText = normalizedValue(text);
+  const bank = cleanReceiptDescription(findLabeledReceiptValue(lines, [
+    "pago via", "paid via", "banco", "bank", "instituição", "instituicao",
+  ]));
+
+  let payment = "";
+  if (/\bpix\b/.test(normalizedText)) payment = "Pix";
+  else if (/\bboleto\b/.test(normalizedText)) payment = ui("Boleto", "Bank slip");
+  else if (/\b(cartao de credito|cartão de crédito|credit card)\b/.test(normalizedText)) payment = ui("Cartão de crédito", "Credit card");
+  else if (/\b(cartao de debito|cartão de débito|debit card)\b/.test(normalizedText)) payment = ui("Cartão de débito", "Debit card");
+  else if (/\b(transferencia|transferência|bank transfer|iban|ted|doc)\b/.test(normalizedText)) payment = ui("Transferência bancária", "Bank transfer");
+  else payment = ui("Verifique se foi Pix, boleto ou transferência", "Check whether it was Pix, bank slip, or transfer");
+
+  const categoryRules = [
+    [/\b(mercado|supermercado|grocery|groceries)\b/, ui("Mercado", "Groceries")],
+    [/\b(farmacia|farmácia|hospital|medico|médico|saude|saúde|health)\b/, ui("Saúde", "Health")],
+    [/\b(aluguel|rent|condominio|condomínio)\b/, ui("Moradia", "Housing")],
+    [/\b(combustivel|combustível|posto|uber|taxi|transporte)\b/, ui("Transporte", "Transport")],
+    [/\b(escola|curso|faculdade|educacao|educação)\b/, ui("Educação", "Education")],
+    [/\b(imposto|taxa|tributo|tax)\b/, ui("Impostos e taxas", "Taxes and fees")],
+    [/\b(restaurante|lanchonete|delivery|ifood|comida)\b/, ui("Alimentação", "Food")],
+  ];
+  const category = categoryRules.find(([pattern]) => pattern.test(normalizedText))?.[1]
+    || (type === "Receita" ? ui("Outras receitas", "Other income") : ui("Outras despesas", "Other expenses"));
+
+  return {
+    description: bank ? `${type === "Receita" ? ui("Recebimento", "Receipt") : ui("Pagamento", "Payment")} - ${bank}` : ui("Informe o motivo ou favorecido", "Enter the purpose or payee"),
+    category,
+    payment,
+    account: bank || ui("Selecione a conta utilizada", "Select the account used"),
+  };
+}
+
 function extractReceiptFields(text, ocrConfidence) {
   const lines = receiptLines(text);
   if (!lines.length) throw new Error(ui("Nenhum texto foi encontrado. Tente uma imagem mais nítida.", "No text was found. Try a clearer image."));
@@ -812,6 +886,7 @@ function extractReceiptFields(text, ocrConfidence) {
   ]));
   const amount = extractReceiptAmount(lines, text);
   const date = extractReceiptDate(text);
+  const receiptReference = extractReceiptReference(lines);
   const currency = /\bBRL\b|R\$/i.test(text) ? "BRL" : (/\bUSD\b|US\$|\$/i.test(text) ? "USD" : (/\bEUR\b|€/i.test(text) ? "EUR" : state.baseCurrency));
   const category = findReceiptOption(`${description} ${text}`, currentCategoryOptions());
   let payment = findReceiptOption(text, state.payments);
@@ -820,6 +895,7 @@ function extractReceiptFields(text, ocrConfidence) {
   }
   const account = findReceiptOption(text, state.accounts);
   const incomeSource = type === "Receita" ? findReceiptOption(text, state.incomeSources) : "";
+  const suggestions = receiptFieldSuggestions(lines, text, type);
   const warnings = [ui("Leitura feita por OCR local. Confirme todos os campos antes de salvar.", "Read with local OCR. Confirm every field before saving.")];
   if (!date) warnings.push(ui("A data não foi identificada.", "The date was not identified."));
   if (!amount) warnings.push(ui("O valor não foi identificado.", "The amount was not identified."));
@@ -840,6 +916,8 @@ function extractReceiptFields(text, ocrConfidence) {
     incomeSource,
     amount,
     currency,
+    receiptReference,
+    suggestions,
     notes: "",
     confidence,
     warnings,
@@ -848,17 +926,18 @@ function extractReceiptFields(text, ocrConfidence) {
 
 function showReceiptReview(data) {
   const labels = [
-    [ui("Tipo", "Type"), data.type],
-    [ui("Data", "Date"), data.date ? formatDate(data.date) : ui("Não identificada", "Not identified")],
-    [ui("Descrição", "Description"), data.description],
-    [ui("Categoria", "Category"), data.category],
-    [ui("Forma de pagamento", "Payment method"), data.payment],
-    [ui("Conta", "Account"), data.account],
-    [ui("Valor", "Amount"), data.amount ? money(data.amount, data.currency || state.baseCurrency) : ui("Não identificado", "Not identified")],
-    [ui("Confiança da leitura", "Reading confidence"), `${Math.round(Number(data.confidence || 0) * 100)}%`],
+    [ui("Tipo", "Type"), data.type, ""],
+    [ui("Data", "Date"), data.date ? formatDate(data.date) : ui("Não identificada", "Not identified"), ""],
+    [ui("Descrição", "Description"), data.description, data.suggestions?.description],
+    [ui("Categoria", "Category"), data.category, data.suggestions?.category],
+    [ui("Forma de pagamento", "Payment method"), data.payment, data.suggestions?.payment],
+    [ui("Conta", "Account"), data.account, data.suggestions?.account],
+    [ui("Autenticação / referência", "Authentication / reference"), data.receiptReference, ""],
+    [ui("Valor", "Amount"), data.amount ? money(data.amount, data.currency || state.baseCurrency) : ui("Não identificado", "Not identified"), ""],
+    [ui("Confiança da leitura", "Reading confidence"), `${Math.round(Number(data.confidence || 0) * 100)}%`, ""],
   ];
 
-  els.receiptReviewSummary.replaceChildren(...labels.map(([label, value]) => {
+  els.receiptReviewSummary.replaceChildren(...labels.map(([label, value, suggestion]) => {
     const item = document.createElement("div");
     item.className = "receipt-review-item";
     const name = document.createElement("span");
@@ -866,6 +945,12 @@ function showReceiptReview(data) {
     name.textContent = label;
     content.textContent = value || ui("Revisar", "Review");
     item.append(name, content);
+    if (!value && suggestion) {
+      const hint = document.createElement("small");
+      hint.className = "receipt-review-suggestion";
+      hint.textContent = `${ui("Sugestão", "Suggestion")}: ${suggestion}`;
+      item.append(hint);
+    }
     return item;
   }));
 
@@ -903,13 +988,14 @@ function applyReceiptExtraction() {
     els.date.value = data.date;
     els.referenceMonth.value = new Date(`${data.date}T00:00:00`).getMonth();
   }
-  els.description.value = data.description || "";
+  els.description.value = data.description || data.suggestions?.description || "";
   selectSuggestedValue(els.category, data.category);
   selectSuggestedValue(els.payment, data.payment);
   selectSuggestedValue(els.account, data.account);
   selectSuggestedValue(els.currency, data.currency);
   if (Number(data.amount) > 0) els.amount.value = Number(data.amount).toFixed(2);
   if (els.type.value === "Receita") selectSuggestedValue(els.incomeSource, data.incomeSource);
+  els.receiptReference.value = data.receiptReference || "";
   els.notes.value = data.notes || "";
   updateConversionPreview();
 
@@ -2139,7 +2225,7 @@ function renderTable() {
   const entries = monthEntries()
     .filter((item) => activeHistoryFilter === "all" || item.type === activeHistoryFilter)
     .filter((item) => {
-      const searchable = [item.description, item.category, item.payment, item.account, item.notes].join(" ").toLowerCase();
+      const searchable = [item.description, item.category, item.payment, item.account, item.receiptReference, item.notes].join(" ").toLowerCase();
       return searchable.includes(query);
     })
     .sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -2156,7 +2242,11 @@ function renderTable() {
           <td>${formatDate(item.date)}</td>
           <td>${displayMonths()[item.referenceMonth]} ${entryYear(item)}</td>
           <td><span class="pill ${item.type === "Receita" ? "income" : "expense"}">${item.type === "Receita" ? ui("Receita", "Income") : ui("Despesa", "Expense")}</span></td>
-          <td><strong>${escapeHtml(item.description)}</strong><br><small>${escapeHtml(item.notes || "")}</small></td>
+          <td>
+            <strong>${escapeHtml(item.description)}</strong>
+            ${item.receiptReference ? `<br><small>${ui("Autenticação / referência", "Authentication / reference")}: ${escapeHtml(item.receiptReference)}</small>` : ""}
+            ${item.notes ? `<br><small>${escapeHtml(item.notes)}</small>` : ""}
+          </td>
           <td>${escapeHtml(item.category)}</td>
           <td>${escapeHtml(item.payment)}</td>
           <td>${escapeHtml(item.account)}</td>
@@ -2201,6 +2291,7 @@ async function saveEntry(event) {
     currency: els.currency.value,
     rates: rateResult?.rates || null,
     rateDate: rateResult?.rateDate || els.date.value,
+    receiptReference: els.receiptReference.value.trim(),
     notes: els.notes.value.trim(),
   };
 
@@ -2249,6 +2340,7 @@ function editEntry(id) {
   els.account.value = item.account;
   els.currency.value = item.currency || "BRL";
   els.amount.value = item.amount;
+  els.receiptReference.value = item.receiptReference || "";
   els.notes.value = item.notes || "";
   els.cancelEdit.classList.remove("hidden");
   activeRegistrationTab = "entry";
@@ -2505,8 +2597,8 @@ function renderGeneralRegistrations() {
 
 function exportCsv() {
   const headers = state.language === "en"
-    ? ["Date", "Reference", "Type", "Source", "Description", "Category", "Method", "Account", "Original amount", "Currency", `Amount in ${state.baseCurrency}`, "Notes"]
-    : ["Data", "Referente", "Tipo", "Origem", "Descrição", "Categoria", "Forma", "Conta", "Valor original", "Moeda", `Valor em ${state.baseCurrency}`, "Observações"];
+    ? ["Date", "Reference", "Type", "Source", "Description", "Category", "Method", "Account", "Original amount", "Currency", `Amount in ${state.baseCurrency}`, "Authentication / reference", "Notes"]
+    : ["Data", "Referente", "Tipo", "Origem", "Descrição", "Categoria", "Forma", "Conta", "Valor original", "Moeda", `Valor em ${state.baseCurrency}`, "Autenticação / referência", "Observações"];
   const rows = state.entries.map((item) => [
     item.date,
     displayMonths()[item.referenceMonth],
@@ -2519,6 +2611,7 @@ function exportCsv() {
     item.amount.toFixed(2).replace(".", ","),
     item.currency || "BRL",
     entryValue(item).toFixed(2).replace(".", ","),
+    item.receiptReference || "",
     item.notes || "",
   ]);
   const csv = [headers, ...rows].map((row) => row.map(csvValue).join(";")).join("\n");

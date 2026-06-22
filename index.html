@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=39" />
+    <link rel="stylesheet" href="./styles.css?v=41" />
   </head>
   <body>
     <main class="app-shell">
@@ -181,6 +181,10 @@
                 <input id="amount" type="number" min="0.01" step="0.01" placeholder="0,00" required />
               </label>
               <div id="conversionPreview" class="conversion-preview wide" role="status"></div>
+              <label class="field wide">
+                <span>Autenticação / referência</span>
+                <input id="receiptReference" class="receipt-reference-input" type="text" placeholder="Opcional" autocomplete="off" />
+              </label>
               <label class="field wide">
                 <span>Observações</span>
                 <input id="notes" type="text" placeholder="Opcional" />
@@ -494,6 +498,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=39"></script>
+    <script src="./app.js?v=41"></script>
   </body>
 </html>

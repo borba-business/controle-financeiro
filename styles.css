@@ -640,6 +640,18 @@ select:focus {
   font-size: 0.92rem;
 }
 
+.receipt-review-suggestion {
+  overflow-wrap: anywhere;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.receipt-reference-input {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
 .receipt-review-warnings {
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
