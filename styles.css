@@ -728,6 +728,7 @@ select:focus {
 .receipt-suggestion-button {
   display: grid;
   place-items: center;
+  position: relative;
   flex: 0 0 30px;
   width: 30px;
   height: 30px;
@@ -737,8 +738,29 @@ select:focus {
   border-radius: 7px;
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
   color: var(--accent);
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 0;
+  line-height: 0;
+}
+
+.receipt-suggestion-button::before,
+.receipt-suggestion-button::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.receipt-suggestion-button::before {
+  width: 12px;
+  height: 2px;
+}
+
+.receipt-suggestion-button::after {
+  width: 2px;
+  height: 12px;
 }
 
 .receipt-suggestion-button:hover {
@@ -1956,16 +1978,38 @@ tbody tr:last-child td {
 .icon-close {
   display: grid;
   place-items: center;
+  position: relative;
   width: 40px;
   height: 40px;
-  padding: 0 0 3px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
   background: var(--surface-2);
   color: var(--text);
-  font-size: 1.45rem;
-  font-family: Arial, sans-serif;
-  line-height: 1;
+  font-size: 0;
+  line-height: 0;
+}
+
+.icon-close::before,
+.icon-close::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.icon-close::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.icon-close::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .auth-form,
