@@ -1065,18 +1065,18 @@ function extractReceiptFields(text, ocrConfidence) {
 
 function showReceiptReview(data) {
   const labels = [
-    [ui("Tipo", "Type"), data.type, ""],
-    [ui("Data", "Date"), data.date ? formatDate(data.date) : ui("Não identificada", "Not identified"), ""],
-    [ui("Descrição", "Description"), data.description, data.suggestions?.description],
-    [ui("Categoria", "Category"), data.category, data.suggestions?.category],
-    [ui("Forma de pagamento", "Payment method"), data.payment, data.suggestions?.payment],
-    [ui("Conta", "Account"), data.account, data.suggestions?.account],
-    [ui("Autenticação / referência", "Authentication / reference"), data.receiptReference, ""],
-    [ui("Valor", "Amount"), data.amount ? money(data.amount, data.currency || state.baseCurrency) : ui("Não identificado", "Not identified"), ""],
-    [ui("Confiança da leitura", "Reading confidence"), `${Math.round(Number(data.confidence || 0) * 100)}%`, ""],
+    [ui("Tipo", "Type"), data.type, "", "type"],
+    [ui("Data", "Date"), data.date ? formatDate(data.date) : ui("Não identificada", "Not identified"), "", "date"],
+    [ui("Descrição", "Description"), data.description, data.suggestions?.description, "description"],
+    [ui("Categoria", "Category"), data.category, data.suggestions?.category, "category"],
+    [ui("Forma de pagamento", "Payment method"), data.payment, data.suggestions?.payment, "payment"],
+    [ui("Conta", "Account"), data.account, data.suggestions?.account, "account"],
+    [ui("Autenticação / referência", "Authentication / reference"), data.receiptReference, "", "receiptReference"],
+    [ui("Valor", "Amount"), data.amount ? money(data.amount, data.currency || state.baseCurrency) : ui("Não identificado", "Not identified"), "", "amount"],
+    [ui("Confiança da leitura", "Reading confidence"), `${Math.round(Number(data.confidence || 0) * 100)}%`, "", "confidence"],
   ];
 
-  els.receiptReviewSummary.replaceChildren(...labels.map(([label, value, suggestion]) => {
+  els.receiptReviewSummary.replaceChildren(...labels.map(([label, value, suggestion, field]) => {
     const item = document.createElement("div");
     item.className = "receipt-review-item";
     const name = document.createElement("span");
@@ -1085,10 +1085,25 @@ function showReceiptReview(data) {
     content.textContent = value || ui("Revisar", "Review");
     item.append(name, content);
     if (!value && suggestion) {
+      const suggestionRow = document.createElement("div");
+      suggestionRow.className = "receipt-review-suggestion-row";
       const hint = document.createElement("small");
       hint.className = "receipt-review-suggestion";
       hint.textContent = `${ui("Sugestão", "Suggestion")}: ${suggestion}`;
-      item.append(hint);
+      suggestionRow.append(hint);
+      if (isActionableReceiptSuggestion(suggestion)) {
+        const useSuggestion = document.createElement("button");
+        useSuggestion.className = "receipt-suggestion-button";
+        useSuggestion.type = "button";
+        useSuggestion.title = ["category", "payment", "account", "incomeSource"].includes(field)
+          ? ui("Usar e cadastrar esta sugestão", "Use and register this suggestion")
+          : ui("Usar esta sugestão", "Use this suggestion");
+        useSuggestion.setAttribute("aria-label", useSuggestion.title);
+        useSuggestion.textContent = "+";
+        useSuggestion.addEventListener("click", () => acceptReceiptSuggestion(field, suggestion));
+        suggestionRow.append(useSuggestion);
+      }
+      item.append(suggestionRow);
     }
     return item;
   }));
@@ -1096,7 +1111,60 @@ function showReceiptReview(data) {
   const warnings = Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : [];
   els.receiptReviewWarnings.classList.toggle("hidden", !warnings.length);
   els.receiptReviewWarnings.textContent = warnings.join(" ");
-  els.receiptReviewDialog.showModal();
+  if (!els.receiptReviewDialog.open) els.receiptReviewDialog.showModal();
+}
+
+function isActionableReceiptSuggestion(suggestion) {
+  const value = normalizedValue(suggestion);
+  return Boolean(value) && !/^(verifique|check whether|selecione|select |informe|enter )/.test(value);
+}
+
+function addUniqueReceiptRegistration(items, suggestion) {
+  const exists = items.some((item) => normalizedValue(item) === normalizedValue(suggestion));
+  return exists ? items : [...items, suggestion];
+}
+
+function acceptReceiptSuggestion(field, suggestion) {
+  if (!pendingReceiptExtraction || !isActionableReceiptSuggestion(suggestion)) return;
+  pendingReceiptExtraction[field] = suggestion;
+  const warningPatterns = {
+    description: /descri[cç][aã]o|description/i,
+    category: /categoria|category/i,
+    payment: /forma de pagamento|payment method/i,
+    account: /conta|account/i,
+    incomeSource: /origem|income source/i,
+  };
+  if (warningPatterns[field] && Array.isArray(pendingReceiptExtraction.warnings)) {
+    pendingReceiptExtraction.warnings = pendingReceiptExtraction.warnings.filter((warning) => !warningPatterns[field].test(warning));
+  }
+  let registered = false;
+
+  if (field === "category") {
+    state.categories.Despesa = addUniqueReceiptRegistration(currentCategoryOptions(), suggestion);
+    updateCategoryOptions();
+    registered = true;
+  } else if (field === "payment") {
+    state.payments = addUniqueReceiptRegistration(state.payments, suggestion);
+    fillSelect(els.payment, state.payments);
+    registered = true;
+  } else if (field === "account") {
+    state.accounts = addUniqueReceiptRegistration(state.accounts, suggestion);
+    fillSelect(els.account, state.accounts);
+    registered = true;
+  } else if (field === "incomeSource") {
+    state.incomeSources = normalizeIncomeSources(addUniqueReceiptRegistration(state.incomeSources, suggestion));
+    fillSelect(els.incomeSource, state.incomeSources);
+    registered = true;
+  }
+
+  if (registered) {
+    renderGeneralRegistrations();
+    persist();
+  }
+  showReceiptReview(pendingReceiptExtraction);
+  setReceiptStatus(registered
+    ? ui("Sugestão aplicada e adicionada aos Cadastros Gerais.", "Suggestion applied and added to General Records.")
+    : ui("Sugestão aplicada ao comprovante.", "Suggestion applied to the receipt."), "success");
 }
 
 function closeReceiptReview() {

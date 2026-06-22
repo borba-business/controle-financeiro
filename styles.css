@@ -718,6 +718,34 @@ select:focus {
   line-height: 1.4;
 }
 
+.receipt-review-suggestion-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.receipt-suggestion-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.receipt-suggestion-button:hover {
+  background: var(--accent);
+  color: var(--surface);
+}
+
 .receipt-reference-input {
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
 }
