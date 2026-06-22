@@ -60,6 +60,18 @@ Object.assign(STATIC_TRANSLATIONS, {
   "Fotografe ou selecione uma imagem ou PDF. A leitura é feita neste aparelho, sem enviar o arquivo.": "Take a photo or select an image or PDF. Reading happens on this device without uploading the file.",
 });
 
+Object.assign(STATIC_TRANSLATIONS, {
+  "Analisar com IA": "Analyze with AI",
+  "Pode gerar custo": "May incur a charge",
+  "Recurso opcional": "Optional feature",
+  "Análise de comprovante com IA": "AI receipt analysis",
+  "Esta análise utiliza uma API paga.": "This analysis uses a paid API.",
+  "Ela pode consumir créditos da conta configurada pelo responsável da planilha. Nenhuma cobrança será iniciada apenas ao abrir esta janela.": "It may consume credits from the account configured by the spreadsheet owner. No charge starts simply by opening this window.",
+  "Ao continuar, o comprovante selecionado será enviado temporariamente ao serviço de inteligência artificial para leitura. Os dados encontrados serão exibidos para sua revisão antes de qualquer lançamento.": "By continuing, the selected receipt will be sent temporarily to the AI service for reading. The extracted data will be shown for your review before any entry is created.",
+  "Entendi que esta solicitação pode gerar custo e desejo continuar.": "I understand this request may incur a charge and want to continue.",
+  "Selecionar e analisar": "Select and analyze",
+});
+
 const PLACEHOLDER_TRANSLATIONS = {
   "Ex.: IPVA, UNIMED, mercado": "E.g.: tax, healthcare, groceries", "Opcional": "Optional", "Digite um nome": "Enter a name",
   "Ex.: Mercado, aluguel, cliente": "E.g.: store, rent, client", "Descrição, categoria, conta...": "Description, category, account..."
@@ -92,6 +104,7 @@ const SUPABASE_KEY = "sb_publishable_0Rglw4_AS_h3B7IZaqN2GA_0Gic3UnW";
 const TESSERACT_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js";
 const PDFJS_MODULE_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs";
 const PDFJS_WORKER_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+const AI_RECEIPT_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/read-receipt`;
 
 let authSession = loadAuthSession();
 migrateLegacyAccountStorage(authSession?.user?.id);
@@ -167,6 +180,13 @@ const els = {
   entryForm: document.querySelector("#entryForm"),
   selectReceipt: document.querySelector("#selectReceipt"),
   receiptFile: document.querySelector("#receiptFile"),
+  openAiReceipt: document.querySelector("#openAiReceipt"),
+  aiReceiptFile: document.querySelector("#aiReceiptFile"),
+  aiReceiptDialog: document.querySelector("#aiReceiptDialog"),
+  closeAiReceiptDialog: document.querySelector("#closeAiReceiptDialog"),
+  cancelAiReceipt: document.querySelector("#cancelAiReceipt"),
+  confirmAiReceipt: document.querySelector("#confirmAiReceipt"),
+  aiCostConsent: document.querySelector("#aiCostConsent"),
   receiptStatus: document.querySelector("#receiptStatus"),
   receiptReviewDialog: document.querySelector("#receiptReviewDialog"),
   closeReceiptReview: document.querySelector("#closeReceiptReview"),
@@ -472,6 +492,17 @@ function bindEvents() {
   els.entryForm.addEventListener("submit", saveEntry);
   els.selectReceipt.addEventListener("click", () => els.receiptFile.click());
   els.receiptFile.addEventListener("change", readReceipt);
+  els.openAiReceipt.addEventListener("click", openAiReceiptDialog);
+  els.closeAiReceiptDialog.addEventListener("click", closeAiReceiptDialog);
+  els.cancelAiReceipt.addEventListener("click", closeAiReceiptDialog);
+  els.aiCostConsent.addEventListener("change", () => {
+    els.confirmAiReceipt.disabled = !els.aiCostConsent.checked;
+  });
+  els.confirmAiReceipt.addEventListener("click", selectAiReceipt);
+  els.aiReceiptFile.addEventListener("change", readReceiptWithAi);
+  els.aiReceiptDialog.addEventListener("click", (event) => {
+    if (event.target === els.aiReceiptDialog) closeAiReceiptDialog();
+  });
   els.closeReceiptReview.addEventListener("click", closeReceiptReview);
   els.cancelReceiptReview.addEventListener("click", closeReceiptReview);
   els.applyReceiptData.addEventListener("click", applyReceiptExtraction);
@@ -549,6 +580,111 @@ function bindEvents() {
 function setReceiptStatus(message, type = "") {
   els.receiptStatus.textContent = message;
   els.receiptStatus.className = `receipt-status${type ? ` ${type}` : ""}`;
+}
+
+function openAiReceiptDialog() {
+  els.aiCostConsent.checked = false;
+  els.confirmAiReceipt.disabled = true;
+  els.aiReceiptDialog.showModal();
+}
+
+function closeAiReceiptDialog() {
+  els.aiCostConsent.checked = false;
+  els.confirmAiReceipt.disabled = true;
+  els.aiReceiptDialog.close();
+}
+
+async function selectAiReceipt() {
+  if (!els.aiCostConsent.checked) return;
+  const session = await ensureSession();
+  if (!session?.user) {
+    closeAiReceiptDialog();
+    setReceiptStatus(ui("Entre e sincronize sua conta antes de usar a análise com IA.", "Sign in and sync your account before using AI analysis."), "error");
+    openAuthDialog();
+    return;
+  }
+  closeAiReceiptDialog();
+  els.aiReceiptFile.click();
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error(ui("Não foi possível preparar o arquivo.", "Could not prepare the file.")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function normalizeAiReceiptResult(payload) {
+  const data = payload?.data || payload;
+  if (!data || typeof data !== "object") throw new Error(ui("A IA não retornou dados válidos.", "The AI did not return valid data."));
+  return {
+    type: data.type === "Receita" ? "Receita" : "Despesa",
+    date: String(data.date || ""),
+    description: cleanReceiptDescription(data.description),
+    category: String(data.category || ""),
+    payment: String(data.payment || ""),
+    account: String(data.account || ""),
+    incomeSource: String(data.incomeSource || ""),
+    amount: Number(data.amount) || 0,
+    currency: ["EUR", "BRL", "USD"].includes(data.currency) ? data.currency : state.baseCurrency,
+    receiptReference: String(data.receiptReference || data.reference || "").slice(0, 220),
+    notes: String(data.notes || ""),
+    confidence: Math.max(0, Math.min(1, Number(data.confidence) || 0)),
+    warnings: Array.isArray(data.warnings) ? data.warnings.map(String) : [],
+    suggestions: data.suggestions && typeof data.suggestions === "object" ? data.suggestions : {},
+  };
+}
+
+async function readReceiptWithAi() {
+  const file = els.aiReceiptFile.files?.[0];
+  if (!file) return;
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+  if (!allowedTypes.includes(file.type) || file.size > 8 * 1024 * 1024) {
+    setReceiptStatus(ui("Use um arquivo JPG, PNG, WEBP ou PDF com no máximo 8 MB.", "Use a JPG, PNG, WEBP, or PDF file no larger than 8 MB."), "error");
+    els.aiReceiptFile.value = "";
+    return;
+  }
+
+  els.openAiReceipt.disabled = true;
+  setReceiptStatus(ui("Enviando temporariamente para análise com IA...", "Sending temporarily for AI analysis..."));
+  try {
+    const session = await ensureSession();
+    if (!session?.access_token) throw new Error(ui("Sua sessão expirou. Entre novamente.", "Your session expired. Sign in again."));
+    const response = await fetch(AI_RECEIPT_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: file.type,
+        fileData: await fileToDataUrl(file),
+        context: {
+          language: state.language,
+          today: new Date().toISOString().slice(0, 10),
+          categories: currentCategoryOptions(),
+          payments: state.payments,
+          accounts: state.accounts,
+          incomeSources: state.incomeSources,
+          baseCurrency: state.baseCurrency,
+        },
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error || ui("A análise com IA não foi concluída.", "AI analysis was not completed."));
+    pendingReceiptExtraction = normalizeAiReceiptResult(payload);
+    showReceiptReview(pendingReceiptExtraction);
+    setReceiptStatus(ui("Análise com IA concluída. Confira os dados antes de salvar.", "AI analysis complete. Review the data before saving."), "success");
+  } catch (error) {
+    setReceiptStatus(error.message || ui("A análise com IA não foi concluída.", "AI analysis was not completed."), "error");
+  } finally {
+    els.aiReceiptFile.value = "";
+    els.openAiReceipt.disabled = false;
+  }
 }
 
 async function readReceipt() {
