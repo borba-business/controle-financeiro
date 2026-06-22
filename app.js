@@ -951,20 +951,23 @@ function extractReceiptReference(lines) {
       const normalizedLabel = normalizedValue(candidate);
       return normalizedLine === normalizedLabel || normalizedLine.startsWith(`${normalizedLabel}:`) || normalizedLine.startsWith(`${normalizedLabel} `);
     });
-    if (!label) continue;
+    const fuzzyLabel = /autentic|referenc|payment reference|transaction id|transa.{0,2}ao|end.?to.?end|e2e|protocolo/.test(normalizedLine);
+    if (!label && !fuzzyLabel) continue;
 
-    const normalizedLabel = normalizedValue(label);
-    const labelWords = normalizedLabel.split(/\s+/).length;
-    const inlineValue = line.replace(/^.*?:/, "").trim() === line.trim()
-      ? line.split(/\s+/).slice(labelWords).join("").trim()
-      : line.replace(/^.*?:/, "").replace(/\s+/g, "").trim();
+    const inlineCandidates = line.match(/[A-Za-z0-9][A-Za-z0-9._/-]{5,}/g) || [];
+    const inlineValue = inlineCandidates.find((candidate) => {
+      const normalizedCandidate = normalizedValue(candidate);
+      return !/autentic|referenc|payment|transaction|transa|protocolo/.test(normalizedCandidate);
+    }) || "";
     const parts = inlineValue ? [inlineValue] : [];
 
-    for (let offset = 1; offset <= 3 && index + offset < lines.length; offset += 1) {
+    for (let offset = 1; offset <= 4 && index + offset < lines.length; offset += 1) {
       const candidateLine = lines[index + offset].trim();
-      if (/\s/.test(candidateLine)) break;
-      const candidate = candidateLine.replace(/\s+/g, "");
+      const normalizedCandidateLine = normalizedValue(candidateLine);
+      if (/^(juros|desconto|pago via|paid via|conta|account|banco|bank)\b/.test(normalizedCandidateLine)) break;
+      const candidate = candidateLine.replace(/\s+/g, "").replace(/[^A-Za-z0-9._/-]/g, "");
       if (!/^[A-Za-z0-9._/-]{6,}$/.test(candidate)) break;
+      if (/\s/.test(candidateLine) && candidate.length < 16) break;
       parts.push(candidate);
     }
 

@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=41" />
+    <link rel="stylesheet" href="./styles.css?v=43" />
   </head>
   <body>
     <main class="app-shell">
@@ -125,7 +125,12 @@
                 </div>
                 <div class="receipt-reader-actions">
                   <button id="selectReceipt" class="secondary" type="button">Selecionar comprovante</button>
+                  <button id="openAiReceipt" class="secondary ai-receipt-button" type="button">
+                    Analisar com IA
+                    <small>Pode gerar custo</small>
+                  </button>
                   <input id="receiptFile" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" />
+                  <input id="aiReceiptFile" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" />
                 </div>
                 <p id="receiptStatus" class="receipt-status" role="status"></p>
               </section>
@@ -497,7 +502,32 @@
       </div>
     </dialog>
 
+    <dialog id="aiReceiptDialog" class="ai-receipt-dialog" aria-labelledby="aiReceiptDialogTitle">
+      <div class="ai-receipt-content">
+        <div class="receipt-review-header">
+          <div>
+            <p class="eyebrow">Recurso opcional</p>
+            <h2 id="aiReceiptDialogTitle">Análise de comprovante com IA</h2>
+          </div>
+          <button id="closeAiReceiptDialog" class="icon-close" type="button" aria-label="Fechar" title="Fechar">×</button>
+        </div>
+        <div class="ai-cost-notice">
+          <strong>Esta análise utiliza uma API paga.</strong>
+          <p>Ela pode consumir créditos da conta configurada pelo responsável da planilha. Nenhuma cobrança será iniciada apenas ao abrir esta janela.</p>
+        </div>
+        <p class="ai-receipt-description">Ao continuar, o comprovante selecionado será enviado temporariamente ao serviço de inteligência artificial para leitura. Os dados encontrados serão exibidos para sua revisão antes de qualquer lançamento.</p>
+        <label class="ai-consent-check">
+          <input id="aiCostConsent" type="checkbox" />
+          <span>Entendi que esta solicitação pode gerar custo e desejo continuar.</span>
+        </label>
+        <div class="receipt-review-actions">
+          <button id="cancelAiReceipt" class="secondary" type="button">Cancelar</button>
+          <button id="confirmAiReceipt" class="primary" type="button" disabled>Selecionar e analisar</button>
+        </div>
+      </div>
+    </dialog>
+
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=41"></script>
+    <script src="./app.js?v=43"></script>
   </body>
 </html>

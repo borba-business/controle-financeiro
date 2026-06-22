@@ -553,6 +553,20 @@ select:focus {
 .receipt-reader-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
+}
+
+.ai-receipt-button {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.ai-receipt-button small {
+  color: var(--accent);
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .receipt-reader-actions button[disabled] {
@@ -592,6 +606,62 @@ select:focus {
 .receipt-review-dialog::backdrop {
   background: rgba(5, 10, 9, 0.76);
   backdrop-filter: blur(5px);
+}
+
+.ai-receipt-dialog {
+  width: min(590px, calc(100% - 32px));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+}
+
+.ai-receipt-dialog::backdrop {
+  background: rgba(5, 10, 9, 0.76);
+  backdrop-filter: blur(5px);
+}
+
+.ai-receipt-content {
+  display: grid;
+  gap: 20px;
+  padding: 26px;
+}
+
+.ai-receipt-content h2,
+.ai-receipt-content p {
+  margin: 0;
+}
+
+.ai-cost-notice {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+}
+
+.ai-cost-notice p,
+.ai-receipt-description,
+.ai-consent-check {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.ai-consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.ai-consent-check input {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
 }
 
 .receipt-review-content {
@@ -1981,6 +2051,14 @@ tbody tr:last-child td {
   .receipt-reader-actions,
   .receipt-reader-actions button {
     width: 100%;
+  }
+
+  .receipt-reader-actions {
+    flex-direction: column;
+  }
+
+  .ai-receipt-content {
+    padding: 20px;
   }
 
   .receipt-review-content {
