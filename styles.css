@@ -153,9 +153,8 @@ button {
   will-change: transform;
 }
 
-.market-ticker:hover .market-ticker-track,
-.market-ticker:focus-within .market-ticker-track {
-  animation-play-state: paused;
+.market-ticker-track.market-ticker-ltr {
+  animation-direction: reverse;
 }
 
 .market-ticker-group {
@@ -175,12 +174,6 @@ button {
   background: transparent;
   color: var(--text);
   white-space: nowrap;
-}
-
-.market-ticker-item:hover,
-.market-ticker-item:focus-visible {
-  color: var(--primary);
-  outline: none;
 }
 
 .market-ticker-pair {
@@ -325,6 +318,7 @@ body.utility-menu-open {
 
 .utility-menu-settings {
   display: grid;
+  gap: 14px;
   margin-top: 18px;
   padding: 16px;
   border: 1px solid var(--line);
@@ -333,7 +327,8 @@ body.utility-menu-open {
 }
 
 .utility-menu-settings .field,
-.utility-menu-settings select {
+.utility-menu-settings select,
+.utility-menu-settings button {
   width: 100%;
   min-width: 0;
 }

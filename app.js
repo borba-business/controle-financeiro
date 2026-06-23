@@ -17,7 +17,7 @@ const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July
 
 const STATIC_TRANSLATIONS = {
   "Mês": "Month", "Ano": "Year", "Idioma": "Language", "Moeda-base": "Base currency", "Moeda": "Currency", "Entrar e sincronizar": "Sign in and sync",
-  "Tema escuro": "Dark theme", "Exportar CSV": "Export CSV", "Limpar Planilha": "Clear Spreadsheet",
+  "Tema": "Theme", "Tema escuro": "Dark theme", "Exportar CSV": "Export CSV", "Limpar Planilha": "Clear Spreadsheet",
   "Saldo inicial": "Starting balance", "Receitas": "Income", "Despesas": "Expenses", "Resultado": "Result",
   "Saldo final": "Final balance", "Lançamentos": "Entries", "Ganhos e gastos": "Income and expenses",
   "Comparativo do período": "Period comparison", "Visão mês a mês": "Month-by-month view", "Cadastros": "Records",
@@ -48,6 +48,9 @@ const STATIC_TRANSLATIONS = {
 Object.assign(STATIC_TRANSLATIONS, {
   "Ferramentas": "Tools",
   "Ações da planilha": "Spreadsheet actions",
+  "Direção do mercado": "Market direction",
+  "Direita para esquerda": "Right to left",
+  "Esquerda para direita": "Left to right",
   "Baixe uma cópia completa dos seus dados ou restaure um arquivo salvo anteriormente.": "Download a complete copy of your data or restore a previously saved file.",
   "Ler comprovante": "Read receipt",
   "Selecionar comprovante": "Select receipt",
@@ -134,6 +137,7 @@ const els = {
   monthFilter: document.querySelector("#monthFilter"),
   yearFilter: document.querySelector("#yearFilter"),
   languageSelect: document.querySelector("#languageSelect"),
+  tickerDirection: document.querySelector("#tickerDirection"),
   baseCurrency: document.querySelector("#baseCurrency"),
   controlYearLabel: document.querySelector("#controlYearLabel"),
   ownerName: document.querySelector("#ownerName"),
@@ -265,6 +269,7 @@ function init() {
   initializeModuleLayout();
   prepareStaticTranslations();
   els.languageSelect.value = state.language;
+  els.tickerDirection.value = state.tickerDirection;
   els.baseCurrency.value = state.baseCurrency;
   els.currency.value = state.baseCurrency;
   els.exchangePair.value = state.exchangePair;
@@ -466,6 +471,7 @@ function bindEvents() {
   els.monthFilter.addEventListener("change", render);
   els.yearFilter.addEventListener("change", render);
   els.languageSelect.addEventListener("change", changeLanguage);
+  els.tickerDirection.addEventListener("change", changeTickerDirection);
   els.baseCurrency.addEventListener("change", changeBaseCurrency);
   els.ownerName.addEventListener("input", updateOwnerName);
   els.searchInput.addEventListener("input", renderTable);
@@ -474,7 +480,6 @@ function bindEvents() {
   els.amount.addEventListener("input", updateConversionPreview);
   els.date.addEventListener("change", updateConversionPreview);
   els.exchangePair.addEventListener("change", changeExchangePair);
-  els.marketTickerTrack.addEventListener("click", selectTickerPair);
   els.exchangePeriod.addEventListener("change", changeExchangePeriod);
   els.searchExchangeRange.addEventListener("click", searchCustomExchangeRange);
   els.exchangeChart.addEventListener("click", (event) => {
@@ -1249,6 +1254,7 @@ function loadState(storageKey = activeStorageKey) {
       ownerName: NEW_USER_OWNER_NAME,
       theme: "light",
       language: "pt",
+      tickerDirection: "rtl",
       baseCurrency: "EUR",
       exchangeRatesCache: {},
       exchangePair: "EUR/BRL",
@@ -1272,6 +1278,7 @@ function loadState(storageKey = activeStorageKey) {
       ownerName: typeof parsed.ownerName === "string" && parsed.ownerName.trim() ? parsed.ownerName : NEW_USER_OWNER_NAME,
       theme: parsed.theme === "dark" ? "dark" : "light",
       language: parsed.language === "en" ? "en" : "pt",
+      tickerDirection: parsed.tickerDirection === "ltr" ? "ltr" : "rtl",
       baseCurrency: ["EUR", "BRL", "USD"].includes(parsed.baseCurrency) ? parsed.baseCurrency : "EUR",
       exchangeRatesCache: parsed.exchangeRatesCache && typeof parsed.exchangeRatesCache === "object" ? parsed.exchangeRatesCache : {},
       exchangePair: typeof parsed.exchangePair === "string" ? parsed.exchangePair : "EUR/BRL",
@@ -1292,6 +1299,7 @@ function loadState(storageKey = activeStorageKey) {
       ownerName: NEW_USER_OWNER_NAME,
       theme: "light",
       language: "pt",
+      tickerDirection: "rtl",
       baseCurrency: "EUR",
       exchangeRatesCache: {},
       exchangePair: "EUR/BRL",
@@ -1582,6 +1590,7 @@ function applyRemoteState(remote) {
   state.ownerName = typeof remote.ownerName === "string" && remote.ownerName.trim() ? remote.ownerName : NEW_USER_OWNER_NAME;
   state.theme = remote.theme === "dark" ? "dark" : "light";
   state.language = remote.language === "en" ? "en" : "pt";
+  state.tickerDirection = remote.tickerDirection === "ltr" ? "ltr" : "rtl";
   state.baseCurrency = ["EUR", "BRL", "USD"].includes(remote.baseCurrency) ? remote.baseCurrency : "EUR";
   state.exchangeRatesCache = remote.exchangeRatesCache && typeof remote.exchangeRatesCache === "object" ? remote.exchangeRatesCache : {};
   state.exchangePair = typeof remote.exchangePair === "string" ? remote.exchangePair : "EUR/BRL";
@@ -1597,6 +1606,7 @@ function applyRemoteState(remote) {
   fillSelect(els.account, state.accounts);
   fillSelect(els.payment, state.payments);
   els.languageSelect.value = state.language;
+  els.tickerDirection.value = state.tickerDirection;
   els.baseCurrency.value = state.baseCurrency;
   els.exchangePair.value = state.exchangePair;
   els.exchangePeriod.value = state.exchangePeriod;
@@ -1704,6 +1714,12 @@ function changeLanguage() {
   persist();
 }
 
+function changeTickerDirection() {
+  state.tickerDirection = els.tickerDirection.value === "ltr" ? "ltr" : "rtl";
+  renderMarketTicker();
+  persist();
+}
+
 function changeBaseCurrency() {
   state.baseCurrency = els.baseCurrency.value;
   render();
@@ -1751,20 +1767,8 @@ function changeExchangePair() {
   persist();
 }
 
-function selectTickerPair(event) {
-  const item = event.target.closest("[data-market-pair]");
-  if (!item) return;
-  const pair = item.dataset.marketPair;
-  if (![...els.exchangePair.options].some((option) => option.value === pair)) return;
-
-  state.exchangePair = pair;
-  els.exchangePair.value = pair;
-  renderExchangeChart();
-  persist();
-  document.querySelector('[data-module-id="exchange"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
 function renderMarketTicker() {
+  els.marketTickerTrack.classList.toggle("market-ticker-ltr", state.tickerDirection === "ltr");
   const history = state.exchangeHistory?.rates || {};
   const rows = Object.entries(history)
     .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
@@ -1792,18 +1796,17 @@ function renderMarketTicker() {
     const signedChange = `${change > 0 ? "+" : ""}${change.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
     const value = current.toLocaleString(locale, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
     const label = `${pair}, ${value}, ${signedChange}, ${ui("cotação de", "rate from")} ${formattedDate}`;
-    return `<button class="market-ticker-item" type="button" role="listitem" data-market-pair="${pair}" aria-label="${label}" title="${ui("Abrir gráfico", "Open chart")} ${pair}">
+    return `<span class="market-ticker-item" role="listitem" aria-label="${label}">
       <span class="market-ticker-pair">${pair}</span>
       <span class="market-ticker-value">${value}</span>
       <span class="market-ticker-change ${direction}">${arrow} ${signedChange}</span>
       <span class="market-ticker-date">${formattedDate}</span>
-    </button>`;
+    </span>`;
   }).join("");
 
   const group = `<div class="market-ticker-group" role="list">${items}</div>`;
-  const duplicateItems = items.replaceAll("<button ", '<button tabindex="-1" ');
-  els.marketTickerTrack.innerHTML = `${group}<div class="market-ticker-group" aria-hidden="true">${duplicateItems}</div>`;
-  els.marketTicker.title = `${ui("Última cotação oficial", "Latest official rate")}: ${formattedDate}. ${ui("Clique em um par para abrir o gráfico.", "Select a pair to open its chart.")}`;
+  els.marketTickerTrack.innerHTML = `${group}<div class="market-ticker-group" aria-hidden="true">${items}</div>`;
+  els.marketTicker.title = `${ui("Última cotação oficial", "Latest official rate")}: ${formattedDate}.`;
 }
 
 function dateKey(date) {
@@ -2802,7 +2805,7 @@ function handleUtilityMenuKeydown(event) {
   }
   if (event.key !== "Tab") return;
 
-  const focusable = Array.from(els.utilityMenu.querySelectorAll("button:not([disabled])"));
+  const focusable = Array.from(els.utilityMenu.querySelectorAll("button:not([disabled]), select:not([disabled]), input:not([disabled])"));
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
   if (event.shiftKey && document.activeElement === first) {

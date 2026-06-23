@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=47" />
+    <link rel="stylesheet" href="./styles.css?v=48" />
   </head>
   <body>
     <main class="app-shell">
@@ -42,7 +42,6 @@
               <option value="USD">USD ($)</option>
             </select>
           </label>
-          <button id="themeToggle" class="secondary theme-toggle" type="button" aria-pressed="false">Tema escuro</button>
           <button id="authButton" class="secondary sync-button" type="button">
             <span id="syncIndicator" class="sync-indicator" aria-hidden="true"></span>
             <span id="authButtonLabel">Entrar e sincronizar</span>
@@ -373,6 +372,17 @@
             <option value="en">English</option>
           </select>
         </label>
+        <label class="field">
+          <span>Tema</span>
+          <button id="themeToggle" class="secondary theme-toggle" type="button" aria-pressed="false">Tema escuro</button>
+        </label>
+        <label class="field">
+          <span>Direção do mercado</span>
+          <select id="tickerDirection" aria-label="Direção da faixa do mercado">
+            <option value="rtl">Direita para esquerda</option>
+            <option value="ltr">Esquerda para direita</option>
+          </select>
+        </label>
       </div>
       <nav class="utility-menu-actions" aria-label="Ações da planilha">
         <button id="exportCsv" class="utility-action" type="button">
@@ -538,6 +548,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=47"></script>
+    <script src="./app.js?v=48"></script>
   </body>
 </html>
