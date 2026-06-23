@@ -1,9 +1,9 @@
-const CACHE_NAME = "controle-financeiro-v50";
+const CACHE_NAME = "controle-financeiro-v51";
 const APP_FILES = [
   "./",
   "./index.html",
-  "./styles.css?v=50",
-  "./app.js?v=50",
+  "./styles.css?v=51",
+  "./app.js?v=51",
   "./manifest.webmanifest",
   "./app-icon.svg",
   "./apple-touch-icon.png",
@@ -28,6 +28,20 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(fetch(event.request).catch(() => caches.match("./index.html")));
+    return;
+  }
+
+  const url = new URL(event.request.url);
+  const networkFirst = url.pathname.endsWith(".js") || url.pathname.endsWith(".css") || url.pathname.endsWith(".html");
+
+  if (networkFirst) {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      }).catch(() => caches.match(event.request))
+    );
     return;
   }
 

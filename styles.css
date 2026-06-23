@@ -143,12 +143,21 @@ button {
   min-width: 0;
   overflow: hidden;
   mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.market-ticker-viewport::-webkit-scrollbar,
+.market-ticker-track::-webkit-scrollbar {
+  display: none;
 }
 
 .market-ticker-track {
   display: flex;
   width: max-content;
+  max-width: none;
   min-height: 100%;
+  overflow: visible;
   animation: market-ticker-scroll 54s linear infinite;
   will-change: transform;
 }
@@ -1605,15 +1614,6 @@ select:focus {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .market-ticker-track {
-    animation: none;
-  }
-
-  .market-ticker-viewport {
-    overflow-x: auto;
-    mask-image: none;
-  }
-
   .exchange-line {
     animation: none;
     stroke-dashoffset: 0;

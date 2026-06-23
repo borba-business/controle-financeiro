@@ -113,6 +113,17 @@ const DEFAULT_MODULE_SIZES = {
   exchange: "half",
   history: "full",
 };
+const MARKET_CURRENCY_PAIRS = ["EUR/BRL", "EUR/USD", "USD/BRL"];
+const MARKET_CRYPTO_ASSETS = [
+  { id: "bitcoin", label: "BTC/USD" },
+  { id: "ethereum", label: "ETH/USD" },
+  { id: "pax-gold", label: "OURO/USD" },
+];
+const MARKET_STOCK_ASSETS = [
+  { symbol: "aapl.us", label: "AAPL" },
+  { symbol: "msft.us", label: "MSFT" },
+  { symbol: "nvda.us", label: "NVDA" },
+];
 const STORAGE_KEY = "controle-financeiro-v1";
 const AUTH_STORAGE_KEY = "controle-financeiro-auth-v1";
 const SUPABASE_URL = "https://uxioksvzpcogcuplfrdj.supabase.co";
@@ -144,6 +155,7 @@ let tesseractLoader = null;
 let pdfJsLoader = null;
 let moduleResizeObserver = null;
 let lastExchangeChartWidth = 0;
+let marketExtrasCache = { fetchedAt: 0, loading: false, items: [] };
 
 const els = {
   sortableModules: null,
@@ -1815,7 +1827,7 @@ function changeBaseCurrency() {
 }
 
 async function fetchExchangeRates(date = "latest") {
-  const response = await fetch(`https://api.frankfurter.dev/v1/${date}?from=EUR&to=BRL,USD`);
+  const response = await fetch(`https://api.frankfurter.dev/v1/${date}?from=EUR&to=BRL,USD`, { cache: "no-store" });
   if (!response.ok) throw new Error("Cotação indisponível");
   const data = await response.json();
   const rates = { EUR: 1, BRL: Number(data.rates?.BRL), USD: Number(data.rates?.USD) };
@@ -1825,13 +1837,16 @@ async function fetchExchangeRates(date = "latest") {
 
 async function getRatesForDate(date) {
   const cacheKey = date || "latest";
-  if (state.exchangeRatesCache[cacheKey]) return state.exchangeRatesCache[cacheKey];
+  const todayKey = dateKey(new Date());
+  const cachedRate = state.exchangeRatesCache[cacheKey];
+  if (cacheKey !== "latest" && cachedRate) return cachedRate;
+  if (cacheKey === "latest" && cachedRate?.fetchedOn === todayKey) return cachedRate;
 
   try {
     const result = await fetchExchangeRates(cacheKey);
-    state.exchangeRatesCache[cacheKey] = result;
+    state.exchangeRatesCache[cacheKey] = cacheKey === "latest" ? { ...result, fetchedOn: todayKey } : result;
     saveLocalState();
-    return result;
+    return state.exchangeRatesCache[cacheKey];
   } catch {
     const cached = state.exchangeRatesCache.latest || Object.values(state.exchangeRatesCache).at(-1);
     if (cached) return { ...cached, fallback: true };
@@ -1854,6 +1869,104 @@ function changeExchangePair() {
   persist();
 }
 
+function formatMarketNumber(value, decimals = 2) {
+  return Number(value).toLocaleString(state.language === "en" ? "en-IE" : "pt-BR", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+function buildMarketTickerItem({ label, value, change = 0, date, decimals = 2, suffix = "" }) {
+  const locale = state.language === "en" ? "en-IE" : "pt-BR";
+  const direction = change > 0.0001 ? "up" : change < -0.0001 ? "down" : "neutral";
+  const arrow = direction === "up" ? "&#9650;" : direction === "down" ? "&#9660;" : "&#8226;";
+  const signedChange = Number(change).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const sign = change > 0 ? "+" : "";
+  const displayValue = `${formatMarketNumber(value, decimals)}${suffix ? ` ${suffix}` : ""}`;
+  const labelText = `${label}, ${displayValue}, ${sign}${signedChange}%, ${ui("cotacao de", "rate from")} ${date}`;
+  return `<span class="market-ticker-item" role="listitem" aria-label="${escapeHtml(labelText)}">
+    <span class="market-ticker-pair">${escapeHtml(label)}</span>
+    <span class="market-ticker-value">${escapeHtml(displayValue)}</span>
+    <span class="market-ticker-change ${direction}">${arrow} ${sign}${signedChange}%</span>
+    <span class="market-ticker-date">${escapeHtml(date)}</span>
+  </span>`;
+}
+
+async function fetchCryptoMarketItems() {
+  const ids = MARKET_CRYPTO_ASSETS.map((item) => item.id).join(",");
+  const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`, { cache: "no-store" });
+  if (!response.ok) throw new Error("Crypto indisponivel");
+  const data = await response.json();
+  const date = new Date().toLocaleDateString(state.language === "en" ? "en-IE" : "pt-BR", { day: "2-digit", month: "2-digit" });
+  return MARKET_CRYPTO_ASSETS
+    .map((asset) => {
+      const snapshot = data[asset.id];
+      if (!snapshot?.usd) return null;
+      return buildMarketTickerItem({
+        label: asset.label,
+        value: snapshot.usd,
+        change: Number(snapshot.usd_24h_change || 0),
+        date,
+        decimals: snapshot.usd >= 100 ? 2 : 4,
+      });
+    })
+    .filter(Boolean);
+}
+
+function parseCsvLine(line) {
+  const values = [];
+  let current = "";
+  let quoted = false;
+  for (const char of line) {
+    if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      values.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  values.push(current);
+  return values.map((value) => value.trim());
+}
+
+async function fetchStockMarketItems() {
+  const symbols = MARKET_STOCK_ASSETS.map((item) => item.symbol).join(",");
+  const response = await fetch(`https://stooq.com/q/l/?s=${symbols}&f=sd2t2ohlcv&e=csv`, { cache: "no-store" });
+  if (!response.ok) throw new Error("Acoes indisponiveis");
+  const text = await response.text();
+  const lines = text.trim().split(/\r?\n/).slice(1);
+  const labelBySymbol = new Map(MARKET_STOCK_ASSETS.map((item) => [item.symbol.toUpperCase(), item.label]));
+  return lines.map((line) => {
+    const [symbol, date, , , , , close] = parseCsvLine(line);
+    const label = labelBySymbol.get(String(symbol).toUpperCase());
+    const value = Number(String(close).replace(",", "."));
+    if (!label || !Number.isFinite(value)) return null;
+    const formattedDate = date && date !== "N/D"
+      ? new Date(`${date}T00:00:00`).toLocaleDateString(state.language === "en" ? "en-IE" : "pt-BR", { day: "2-digit", month: "2-digit" })
+      : new Date().toLocaleDateString(state.language === "en" ? "en-IE" : "pt-BR", { day: "2-digit", month: "2-digit" });
+    return buildMarketTickerItem({
+      label,
+      value,
+      change: 0,
+      date: formattedDate,
+      decimals: 2,
+    });
+  }).filter(Boolean);
+}
+
+async function refreshMarketExtrasIfNeeded() {
+  const maxAge = 10 * 60 * 1000;
+  if (marketExtrasCache.loading || Date.now() - marketExtrasCache.fetchedAt < maxAge) return;
+  marketExtrasCache.loading = true;
+  const results = await Promise.allSettled([fetchCryptoMarketItems(), fetchStockMarketItems()]);
+  marketExtrasCache.items = results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+  marketExtrasCache.fetchedAt = Date.now();
+  marketExtrasCache.loading = false;
+  renderMarketTicker();
+}
+
 function renderMarketTicker() {
   els.marketTickerTrack.classList.toggle("market-ticker-ltr", state.tickerDirection === "ltr");
   const history = state.exchangeHistory?.rates || {};
@@ -1868,8 +1981,7 @@ function renderMarketTicker() {
 
   const [, previousSnapshot] = rows.at(-2);
   const [latestDate, latestSnapshot] = rows.at(-1);
-  const pairSet = ["EUR/BRL", "BRL/EUR", "EUR/USD", "USD/EUR", "BRL/USD", "USD/BRL"];
-  const pairs = [...pairSet, ...pairSet];
+  const pairs = MARKET_CURRENCY_PAIRS;
   const locale = state.language === "en" ? "en-IE" : "pt-BR";
   const formattedDate = new Date(`${latestDate}T00:00:00`).toLocaleDateString(locale, { day: "2-digit", month: "2-digit" });
 
@@ -1894,6 +2006,37 @@ function renderMarketTicker() {
   const group = `<div class="market-ticker-group" role="list">${items}</div>`;
   els.marketTickerTrack.innerHTML = `${group}<div class="market-ticker-group" aria-hidden="true">${items}</div>`;
   els.marketTicker.title = `${ui("Última cotação oficial", "Latest official rate")}: ${formattedDate}.`;
+}
+
+function renderMarketTicker() {
+  els.marketTickerTrack.classList.toggle("market-ticker-ltr", state.tickerDirection === "ltr");
+  const history = state.exchangeHistory?.rates || {};
+  const rows = Object.entries(history)
+    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+    .filter(([, snapshot]) => snapshot && Number(snapshot.BRL) && Number(snapshot.USD));
+
+  if (rows.length < 2) {
+    els.marketTickerTrack.innerHTML = `<span class="market-ticker-loading">${ui("Consultando cotações do mercado...", "Loading market rates...")}</span>`;
+    return;
+  }
+
+  const [, previousSnapshot] = rows.at(-2);
+  const [latestDate, latestSnapshot] = rows.at(-1);
+  const locale = state.language === "en" ? "en-IE" : "pt-BR";
+  const formattedDate = new Date(`${latestDate}T00:00:00`).toLocaleDateString(locale, { day: "2-digit", month: "2-digit" });
+  const currencyItems = MARKET_CURRENCY_PAIRS.map((pair) => {
+    const [source, target] = pair.split("/");
+    const current = exchangePairValue(latestSnapshot, source, target);
+    const previous = exchangePairValue(previousSnapshot, source, target);
+    const change = previous ? ((current - previous) / previous) * 100 : 0;
+    return buildMarketTickerItem({ label: pair, value: current, change, date: formattedDate, decimals: 4 });
+  });
+  const items = [...currencyItems, ...marketExtrasCache.items].join("");
+  const group = `<div class="market-ticker-group" role="list">${items}</div>`;
+
+  els.marketTickerTrack.innerHTML = `${group}<div class="market-ticker-group" aria-hidden="true">${items}</div>`;
+  els.marketTicker.title = `${ui("Última cotação oficial", "Latest official rate")}: ${formattedDate}.`;
+  refreshMarketExtrasIfNeeded();
 }
 
 function dateKey(date) {
@@ -1978,7 +2121,7 @@ async function loadExchangeHistory(force = false) {
     const requestStart = new Date(`${startDate}T00:00:00Z`);
     requestStart.setUTCDate(requestStart.getUTCDate() - 7);
     const apiStartDate = dateKey(requestStart);
-    const response = await fetch(`https://api.frankfurter.dev/v1/${apiStartDate}..${endDate}?from=EUR&to=BRL,USD`);
+    const response = await fetch(`https://api.frankfurter.dev/v1/${apiStartDate}..${endDate}?from=EUR&to=BRL,USD`, { cache: "no-store" });
     if (!response.ok) throw new Error("Histórico indisponível");
     const data = await response.json();
     state.exchangeHistory = { fetchedOn: todayKey, rangeKey, startDate, endDate, rates: data.rates || {} };
