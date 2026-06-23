@@ -46,6 +46,19 @@ const STATIC_TRANSLATIONS = {
 };
 
 Object.assign(STATIC_TRANSLATIONS, {
+  "Recorrências": "Recurrences",
+  "Lançamentos automáticos": "Automatic entries",
+  "Recorrências mensais": "Monthly recurrences",
+  "Gerar mês selecionado": "Generate selected month",
+  "Dia do mês": "Day of month",
+  "Início": "Start",
+  "Fim opcional": "Optional end",
+  "Salvar recorrência": "Save recurrence",
+  "Cancelar edição": "Cancel editing",
+  "Ativar": "Enable",
+  "Pausar": "Pause",
+  "Gerado": "Generated",
+  "Pausada": "Paused",
   "Ferramentas": "Tools",
   "Ações da planilha": "Spreadsheet actions",
   "Direção do mercado": "Market direction",
@@ -184,6 +197,25 @@ const els = {
   incomeSummaryPanel: document.querySelector("#incomeSummaryPanel"),
   nameSheetPanel: document.querySelector("#nameSheetPanel"),
   entryForm: document.querySelector("#entryForm"),
+  recurrencesPanel: document.querySelector("#recurrencesPanel"),
+  recurrenceForm: document.querySelector("#recurrenceForm"),
+  recurrenceEditingId: document.querySelector("#recurrenceEditingId"),
+  recurrenceType: document.querySelector("#recurrenceType"),
+  recurrenceDay: document.querySelector("#recurrenceDay"),
+  recurrenceDescription: document.querySelector("#recurrenceDescription"),
+  recurrenceCategory: document.querySelector("#recurrenceCategory"),
+  recurrenceIncomeSource: document.querySelector("#recurrenceIncomeSource"),
+  recurrencePayment: document.querySelector("#recurrencePayment"),
+  recurrenceAccount: document.querySelector("#recurrenceAccount"),
+  recurrenceCurrency: document.querySelector("#recurrenceCurrency"),
+  recurrenceAmount: document.querySelector("#recurrenceAmount"),
+  recurrenceStart: document.querySelector("#recurrenceStart"),
+  recurrenceEnd: document.querySelector("#recurrenceEnd"),
+  recurrenceNotes: document.querySelector("#recurrenceNotes"),
+  recurrenceStatus: document.querySelector("#recurrenceStatus"),
+  generateRecurrences: document.querySelector("#generateRecurrences"),
+  cancelRecurrenceEdit: document.querySelector("#cancelRecurrenceEdit"),
+  recurrencesList: document.querySelector("#recurrencesList"),
   selectReceipt: document.querySelector("#selectReceipt"),
   receiptFile: document.querySelector("#receiptFile"),
   openAiReceipt: document.querySelector("#openAiReceipt"),
@@ -281,9 +313,12 @@ function init() {
   fillSelect(els.incomeSource, state.incomeSources);
   fillSelect(els.payment, state.payments);
   fillSelect(els.account, state.accounts);
+  refreshRecurrenceSelects();
   els.monthFilter.value = new Date().getMonth();
   els.yearFilter.value = new Date().getFullYear();
   els.referenceMonth.value = new Date().getMonth();
+  els.recurrenceStart.value = monthInputValue(new Date().getFullYear(), new Date().getMonth());
+  els.recurrenceCurrency.value = state.baseCurrency;
   
   const today = new Date();
   const yyyy = today.getFullYear();
@@ -498,6 +533,11 @@ function bindEvents() {
     if (event.target === els.exchangeChartDialog) els.exchangeChartDialog.close();
   });
   els.entryForm.addEventListener("submit", saveEntry);
+  els.recurrenceForm.addEventListener("submit", saveRecurrence);
+  els.recurrenceType.addEventListener("change", updateRecurrenceIncomeSourceState);
+  els.generateRecurrences.addEventListener("click", generateSelectedMonthRecurrences);
+  els.cancelRecurrenceEdit.addEventListener("click", clearRecurrenceForm);
+  els.recurrencesList.addEventListener("click", handleRecurrenceListClick);
   els.selectReceipt.addEventListener("click", () => els.receiptFile.click());
   els.receiptFile.addEventListener("change", readReceipt);
   els.openAiReceipt.addEventListener("click", openAiReceiptDialog);
@@ -1163,6 +1203,7 @@ function acceptReceiptSuggestion(field, suggestion) {
   } else if (field === "account") {
     state.accounts = addUniqueReceiptRegistration(state.accounts, suggestion);
     fillSelect(els.account, state.accounts);
+    refreshRecurrenceSelects();
     registered = true;
   } else if (field === "incomeSource") {
     state.incomeSources = normalizeIncomeSources(addUniqueReceiptRegistration(state.incomeSources, suggestion));
@@ -1247,6 +1288,7 @@ function loadState(storageKey = activeStorageKey) {
   if (!saved) {
     return {
       entries: [],
+      recurrences: [],
       accounts: DEFAULT_ACCOUNTS,
       payments: DEFAULT_PAYMENTS,
       incomeSources: DEFAULT_INCOME_SOURCES,
@@ -1271,6 +1313,7 @@ function loadState(storageKey = activeStorageKey) {
     const parsed = JSON.parse(saved);
     return {
       entries: Array.isArray(parsed.entries) ? parsed.entries : [],
+      recurrences: Array.isArray(parsed.recurrences) ? parsed.recurrences : [],
       accounts: Array.isArray(parsed.accounts) ? parsed.accounts : DEFAULT_ACCOUNTS,
       payments: Array.isArray(parsed.payments) ? parsed.payments : DEFAULT_PAYMENTS,
       incomeSources: Array.isArray(parsed.incomeSources) ? normalizeIncomeSources(parsed.incomeSources) : DEFAULT_INCOME_SOURCES,
@@ -1292,6 +1335,7 @@ function loadState(storageKey = activeStorageKey) {
   } catch {
     return {
       entries: [],
+      recurrences: [],
       accounts: DEFAULT_ACCOUNTS,
       payments: DEFAULT_PAYMENTS,
       incomeSources: DEFAULT_INCOME_SOURCES,
@@ -1583,6 +1627,7 @@ async function loadRemoteState() {
 
 function applyRemoteState(remote) {
   state.entries = Array.isArray(remote.entries) ? remote.entries : [];
+  state.recurrences = Array.isArray(remote.recurrences) ? remote.recurrences : [];
   state.accounts = Array.isArray(remote.accounts) ? remote.accounts : [...DEFAULT_ACCOUNTS];
   state.payments = Array.isArray(remote.payments) ? remote.payments : [...DEFAULT_PAYMENTS];
   state.incomeSources = Array.isArray(remote.incomeSources) ? normalizeIncomeSources(remote.incomeSources) : [...DEFAULT_INCOME_SOURCES];
@@ -1605,6 +1650,7 @@ function applyRemoteState(remote) {
   fillSelect(els.incomeSource, state.incomeSources);
   fillSelect(els.account, state.accounts);
   fillSelect(els.payment, state.payments);
+  refreshRecurrenceSelects();
   els.languageSelect.value = state.language;
   els.tickerDirection.value = state.tickerDirection;
   els.baseCurrency.value = state.baseCurrency;
@@ -1656,6 +1702,47 @@ function fillSelect(select, values) {
     option.textContent = typeof item === "object" ? item.label : item;
     select.append(option);
   });
+}
+
+function selectHasValue(select, value) {
+  return Array.from(select.options).some((option) => option.value === value);
+}
+
+function ensureSelectOption(select, value, suffix = "") {
+  if (!value || selectHasValue(select, value)) return;
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = suffix ? `${value} (${suffix})` : value;
+  select.append(option);
+}
+
+function refreshRecurrenceSelects() {
+  if (!els.recurrenceCategory) return;
+  const currentValues = {
+    category: els.recurrenceCategory.value,
+    incomeSource: els.recurrenceIncomeSource.value,
+    payment: els.recurrencePayment.value,
+    account: els.recurrenceAccount.value,
+  };
+  const item = {
+    category: currentValues.category,
+    incomeSource: currentValues.incomeSource,
+    payment: currentValues.payment,
+  };
+
+  fillSelect(els.recurrenceCategory, currentCategoryOptions());
+  ensureSelectOption(els.recurrenceCategory, item.category, ui("histÃ³rico", "history"));
+  fillSelect(els.recurrenceIncomeSource, state.incomeSources);
+  ensureSelectOption(els.recurrenceIncomeSource, item.incomeSource, ui("histÃ³rico", "history"));
+  fillSelect(els.recurrencePayment, state.payments);
+  ensureSelectOption(els.recurrencePayment, item.payment, ui("histÃ³rico", "history"));
+  fillSelect(els.recurrenceAccount, state.accounts);
+
+  if (selectHasValue(els.recurrenceCategory, currentValues.category)) els.recurrenceCategory.value = currentValues.category;
+  if (selectHasValue(els.recurrenceIncomeSource, currentValues.incomeSource)) els.recurrenceIncomeSource.value = currentValues.incomeSource;
+  if (selectHasValue(els.recurrencePayment, currentValues.payment)) els.recurrencePayment.value = currentValues.payment;
+  if (selectHasValue(els.recurrenceAccount, currentValues.account)) els.recurrenceAccount.value = currentValues.account;
+  updateRecurrenceIncomeSourceState();
 }
 
 function normalizeIncomeSources(values) {
@@ -2315,6 +2402,7 @@ function updateCategoryOptions() {
   const typeValue = els.type.value;
   fillSelect(els.category, currentCategoryOptions());
   els.incomeSource.disabled = typeValue === "Despesa";
+  refreshRecurrenceSelects();
   if (typeValue === "Despesa") {
     ensureIncomeSourceOption("Não se aplica");
     els.incomeSource.value = "Não se aplica";
@@ -2380,6 +2468,7 @@ function render() {
   renderTable();
   renderExchangeChart();
   renderMarketTicker();
+  renderRecurrences();
   applyStaticTranslations();
 }
 
@@ -2632,6 +2721,206 @@ function deleteEntry(id) {
   render();
 }
 
+function monthInputValue(year, monthIndex) {
+  return `${year}-${String(Number(monthIndex) + 1).padStart(2, "0")}`;
+}
+
+function formatMonthKey(value) {
+  if (!value || !/^\d{4}-\d{2}$/.test(value)) return ui("não definido", "not set");
+  const [year, month] = value.split("-").map(Number);
+  return `${displayMonths()[month - 1]} ${year}`;
+}
+
+function selectedPeriodKey() {
+  return monthInputValue(selectedYear(), selectedMonth());
+}
+
+function monthKeyFromDate(dateValue) {
+  const date = new Date(`${dateValue}T00:00:00`);
+  return monthInputValue(date.getFullYear(), date.getMonth());
+}
+
+function recurrenceAppliesToPeriod(item, periodKey = selectedPeriodKey()) {
+  if (!item?.active) return false;
+  if (item.startMonth && periodKey < item.startMonth) return false;
+  if (item.endMonth && periodKey > item.endMonth) return false;
+  return true;
+}
+
+function recurrenceDateForPeriod(item, periodKey) {
+  const [year, month] = periodKey.split("-").map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+  const day = Math.min(Math.max(1, Number(item.day) || 1), lastDay);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function updateRecurrenceIncomeSourceState() {
+  if (!els.recurrenceIncomeSource) return;
+  const isExpense = els.recurrenceType.value === "Despesa";
+  els.recurrenceIncomeSource.disabled = isExpense;
+  if (isExpense) els.recurrenceIncomeSource.value = "Não se aplica";
+}
+
+function clearRecurrenceForm() {
+  els.recurrenceForm.reset();
+  els.recurrenceEditingId.value = "";
+  els.recurrenceType.value = "Despesa";
+  els.recurrenceDay.value = 1;
+  els.recurrenceStart.value = selectedPeriodKey();
+  els.recurrenceCurrency.value = state.baseCurrency;
+  els.cancelRecurrenceEdit.classList.add("hidden");
+  updateRecurrenceIncomeSourceState();
+}
+
+function saveRecurrence(event) {
+  event.preventDefault();
+  const startMonth = els.recurrenceStart.value;
+  const endMonth = els.recurrenceEnd.value;
+  if (endMonth && endMonth < startMonth) {
+    alert(ui("A data final não pode ser anterior ao início.", "The end date cannot be before the start."));
+    return;
+  }
+
+  const data = {
+    id: els.recurrenceEditingId.value || crypto.randomUUID(),
+    active: true,
+    type: els.recurrenceType.value,
+    day: Math.max(1, Math.min(31, Number(els.recurrenceDay.value) || 1)),
+    description: els.recurrenceDescription.value.trim(),
+    category: els.recurrenceCategory.value,
+    incomeSource: els.recurrenceType.value === "Receita" ? els.recurrenceIncomeSource.value : "Não se aplica",
+    payment: els.recurrencePayment.value,
+    account: els.recurrenceAccount.value,
+    currency: els.recurrenceCurrency.value,
+    amount: Number(els.recurrenceAmount.value),
+    startMonth,
+    endMonth: endMonth || "",
+    notes: els.recurrenceNotes.value.trim(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const index = state.recurrences.findIndex((item) => item.id === data.id);
+  if (index >= 0) {
+    data.active = state.recurrences[index].active !== false;
+    state.recurrences[index] = data;
+  } else {
+    state.recurrences.push(data);
+  }
+
+  persist();
+  clearRecurrenceForm();
+  renderRecurrences();
+}
+
+function editRecurrence(id) {
+  const item = state.recurrences.find((recurrence) => recurrence.id === id);
+  if (!item) return;
+  els.recurrenceEditingId.value = item.id;
+  els.recurrenceType.value = item.type;
+  els.recurrenceDay.value = item.day;
+  els.recurrenceDescription.value = item.description;
+  ensureCategoryOption(item.category);
+  fillSelect(els.recurrenceCategory, currentCategoryOptions());
+  els.recurrenceCategory.value = item.category;
+  ensureIncomeSourceOption(item.incomeSource);
+  fillSelect(els.recurrenceIncomeSource, state.incomeSources);
+  els.recurrenceIncomeSource.value = item.incomeSource || "Não se aplica";
+  ensurePaymentOption(item.payment);
+  fillSelect(els.recurrencePayment, state.payments);
+  els.recurrencePayment.value = item.payment;
+  els.recurrenceAccount.value = item.account;
+  els.recurrenceCurrency.value = item.currency || state.baseCurrency;
+  els.recurrenceAmount.value = item.amount;
+  els.recurrenceStart.value = item.startMonth || selectedPeriodKey();
+  els.recurrenceEnd.value = item.endMonth || "";
+  els.recurrenceNotes.value = item.notes || "";
+  els.cancelRecurrenceEdit.classList.remove("hidden");
+  updateRecurrenceIncomeSourceState();
+  els.recurrenceForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function toggleRecurrence(id) {
+  const item = state.recurrences.find((recurrence) => recurrence.id === id);
+  if (!item) return;
+  item.active = item.active === false;
+  item.updatedAt = new Date().toISOString();
+  persist();
+  renderRecurrences();
+}
+
+function deleteRecurrence(id) {
+  const item = state.recurrences.find((recurrence) => recurrence.id === id);
+  if (!item) return;
+  if (!confirm(`${ui("Remover recorrência", "Remove recurrence")} "${item.description}"? ${ui("Os lançamentos já gerados serão mantidos.", "Already generated entries will be kept.")}`)) return;
+  state.recurrences = state.recurrences.filter((recurrence) => recurrence.id !== id);
+  persist();
+  renderRecurrences();
+}
+
+function handleRecurrenceListClick(event) {
+  const button = event.target.closest("[data-recurrence-action]");
+  if (!button) return;
+  const id = button.dataset.id;
+  const action = button.dataset.recurrenceAction;
+  if (action === "edit") editRecurrence(id);
+  if (action === "toggle") toggleRecurrence(id);
+  if (action === "delete") deleteRecurrence(id);
+}
+
+async function generateSelectedMonthRecurrences() {
+  const periodKey = selectedPeriodKey();
+  const activeRules = state.recurrences.filter((item) => recurrenceAppliesToPeriod(item, periodKey));
+  const pendingRules = activeRules.filter((item) => !state.entries.some((entry) => entry.recurrenceId === item.id && entry.recurrencePeriodKey === periodKey));
+
+  if (!activeRules.length) {
+    setRecurrenceStatus(ui("Nenhuma recorrência ativa para este mês.", "No active recurrences for this month."), "muted");
+    return;
+  }
+  if (!pendingRules.length) {
+    setRecurrenceStatus(ui("Todas as recorrências deste mês já foram geradas.", "All recurrences for this month have already been generated."), "success");
+    return;
+  }
+  if (!confirm(ui(`Gerar ${pendingRules.length} lançamento(s) recorrente(s) para ${displayMonths()[selectedMonth()]} ${selectedYear()}?`, `Generate ${pendingRules.length} recurring entry/entries for ${displayMonths()[selectedMonth()]} ${selectedYear()}?`))) return;
+
+  els.generateRecurrences.disabled = true;
+  setRecurrenceStatus(ui("Gerando lançamentos recorrentes...", "Generating recurring entries..."), "muted");
+
+  for (const rule of pendingRules) {
+    const date = recurrenceDateForPeriod(rule, periodKey);
+    const rateResult = await getRatesForDate(date);
+    state.entries.push({
+      id: crypto.randomUUID(),
+      date,
+      referenceMonth: selectedMonth(),
+      type: rule.type,
+      incomeSource: rule.type === "Receita" ? rule.incomeSource : "Não se aplica",
+      description: rule.description,
+      category: rule.category,
+      payment: rule.payment,
+      account: rule.account,
+      amount: Number(rule.amount),
+      currency: rule.currency || state.baseCurrency,
+      rates: rateResult?.rates || null,
+      rateDate: rateResult?.rateDate || date,
+      receiptReference: "",
+      notes: rule.notes || ui("Gerado por recorrência mensal", "Generated by monthly recurrence"),
+      recurrenceId: rule.id,
+      recurrencePeriodKey: periodKey,
+    });
+  }
+
+  els.generateRecurrences.disabled = false;
+  persist();
+  fillYearFilter(selectedYear());
+  render();
+  setRecurrenceStatus(ui(`${pendingRules.length} lançamento(s) gerado(s) para este mês.`, `${pendingRules.length} entry/entries generated for this month.`), "success");
+}
+
+function setRecurrenceStatus(message, type = "muted") {
+  els.recurrenceStatus.textContent = message;
+  els.recurrenceStatus.className = `recurrence-status ${type}`;
+}
+
 function ensureCategoryOption(category) {
   if (!category || currentCategoryOptions().includes(category)) return;
   const option = document.createElement("option");
@@ -2707,17 +2996,21 @@ function addGeneralRegistrationItem(event) {
     state.accounts = [...state.accounts, cleanName];
     fillSelect(els.account, state.accounts);
     els.account.value = cleanName;
+    refreshRecurrenceSelects();
   } else if (activeSubRegistrationTab === "payments") {
     state.payments = [...state.payments, cleanName];
     fillSelect(els.payment, state.payments);
     els.payment.value = cleanName;
+    refreshRecurrenceSelects();
   } else {
     state.incomeSources = normalizeIncomeSources([...state.incomeSources, cleanName]);
     fillSelect(els.incomeSource, state.incomeSources);
     els.incomeSource.value = cleanName;
+    refreshRecurrenceSelects();
   }
 
   els.newIncomeSource.value = "";
+  refreshRecurrenceSelects();
   renderGeneralRegistrations();
   persist();
 }
@@ -2740,15 +3033,18 @@ function removeGeneralRegistrationItem(event) {
   } else if (activeSubRegistrationTab === "accounts") {
     state.accounts = state.accounts.filter((item) => item !== selectedItem);
     fillSelect(els.account, state.accounts);
+    refreshRecurrenceSelects();
   } else if (activeSubRegistrationTab === "payments") {
     state.payments = state.payments.filter((item) => item !== selectedItem);
     fillSelect(els.payment, state.payments);
+    refreshRecurrenceSelects();
   } else {
     state.incomeSources = normalizeIncomeSources(state.incomeSources.filter((item) => item !== selectedItem));
     fillSelect(els.incomeSource, state.incomeSources);
     els.incomeSource.value = state.incomeSources[0] || "Não se aplica";
   }
 
+  refreshRecurrenceSelects();
   renderGeneralRegistrations();
   persist();
 }
@@ -2838,9 +3134,57 @@ function renderRegistrationTabs() {
     button.classList.toggle("active", button.dataset.registrationTab === activeRegistrationTab);
   });
   els.entryForm.classList.toggle("hidden", activeRegistrationTab !== "entry");
+  els.recurrencesPanel.classList.toggle("hidden", activeRegistrationTab !== "recurrences");
   els.incomeSourcesPanel.classList.toggle("hidden", activeRegistrationTab !== "incomeSources");
   els.nameSheetPanel.classList.toggle("hidden", activeRegistrationTab !== "name");
+  renderRecurrences();
   renderGeneralRegistrations();
+}
+
+function renderRecurrences() {
+  if (!els.recurrencesList) return;
+  refreshRecurrenceSelects();
+
+  const periodKey = selectedPeriodKey();
+  const monthName = `${displayMonths()[selectedMonth()]} ${selectedYear()}`;
+  const activeCount = state.recurrences.filter((item) => recurrenceAppliesToPeriod(item, periodKey)).length;
+  const generatedCount = state.recurrences.filter((item) => state.entries.some((entry) => entry.recurrenceId === item.id && entry.recurrencePeriodKey === periodKey)).length;
+  setRecurrenceStatus(ui(`${activeCount} recorrência(s) ativa(s) para ${monthName}. ${generatedCount} já gerada(s).`, `${activeCount} active recurrence(s) for ${monthName}. ${generatedCount} already generated.`), "muted");
+
+  if (!state.recurrences.length) {
+    els.recurrencesList.innerHTML = `<div class="empty-state">${ui("Nenhuma recorrência cadastrada.", "No recurrences registered.")}</div>`;
+    return;
+  }
+
+  els.recurrencesList.innerHTML = state.recurrences
+    .map((item) => {
+      const generated = state.entries.some((entry) => entry.recurrenceId === item.id && entry.recurrencePeriodKey === periodKey);
+      const applies = recurrenceAppliesToPeriod(item, periodKey);
+      const range = `${formatMonthKey(item.startMonth)}${item.endMonth ? ` - ${formatMonthKey(item.endMonth)}` : ` - ${ui("sem fim", "no end")}`}`;
+      return `
+        <article class="recurrence-card ${item.active === false ? "is-paused" : ""}">
+          <div class="recurrence-card-main">
+            <div>
+              <div class="recurrence-card-title">
+                <strong>${escapeHtml(item.description)}</strong>
+                <span class="pill ${item.type === "Receita" ? "income" : "expense"}">${item.type === "Receita" ? ui("Receita", "Income") : ui("Despesa", "Expense")}</span>
+                ${item.active === false ? `<span class="recurrence-badge muted">${ui("Pausada", "Paused")}</span>` : ""}
+                ${generated ? `<span class="recurrence-badge success">${ui("Gerado", "Generated")}</span>` : ""}
+              </div>
+              <p>${escapeHtml(item.category)} · ${escapeHtml(item.payment)} · ${escapeHtml(item.account)}</p>
+              <small>${ui("Dia", "Day")} ${item.day} · ${range}${applies && !generated ? ` · ${ui("pendente para este mês", "pending for this month")}` : ""}</small>
+            </div>
+            <strong>${money(item.amount, item.currency || state.baseCurrency)}</strong>
+          </div>
+          <div class="recurrence-card-actions">
+            <button type="button" data-recurrence-action="edit" data-id="${item.id}">${ui("Editar", "Edit")}</button>
+            <button type="button" data-recurrence-action="toggle" data-id="${item.id}">${item.active === false ? ui("Ativar", "Enable") : ui("Pausar", "Pause")}</button>
+            <button type="button" data-recurrence-action="delete" data-id="${item.id}">${ui("Excluir", "Delete")}</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
 }
 
 function renderGeneralRegistrations() {

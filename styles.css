@@ -1831,6 +1831,180 @@ body.dark .fill.accent {
   gap: 16px;
 }
 
+.recurrences-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.recurrence-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.recurrence-toolbar h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.recurrence-toolbar p,
+.recurrence-card p,
+.recurrence-card small {
+  margin: 0;
+  color: var(--muted);
+}
+
+.recurrence-toolbar button,
+.recurrence-form-actions button,
+.recurrence-card-actions button {
+  min-height: 44px;
+  border-radius: 8px;
+  padding: 0 18px;
+  font-weight: 800;
+}
+
+.recurrence-toolbar button,
+.recurrence-form-actions button[type="submit"] {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.recurrence-toolbar button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.recurrence-status {
+  min-height: 42px;
+  margin: 0;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.recurrence-status.success {
+  border-color: color-mix(in srgb, var(--income) 36%, var(--line));
+  color: var(--income);
+}
+
+.recurrence-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.recurrence-form-actions button[type="button"] {
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.recurrences-list {
+  display: grid;
+  gap: 10px;
+}
+
+.recurrence-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  padding: 14px 16px;
+}
+
+.recurrence-card.is-paused {
+  opacity: 0.68;
+}
+
+.recurrence-card-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+}
+
+.recurrence-card-main > div,
+.recurrence-card-title {
+  min-width: 0;
+}
+
+.recurrence-card-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.recurrence-card-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recurrence-card-main > strong {
+  flex: 0 0 auto;
+  font-size: 1rem;
+}
+
+.recurrence-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.recurrence-card-actions button {
+  min-height: 36px;
+  border: 1px solid transparent;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 12px;
+  font-size: 0.8rem;
+}
+
+.recurrence-card-actions button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.recurrence-card-actions button[data-recurrence-action="delete"]:hover {
+  border-color: var(--expense);
+  color: var(--expense);
+  background: color-mix(in srgb, var(--expense) 8%, transparent);
+}
+
+.recurrence-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 0 10px;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.recurrence-badge.success {
+  background: color-mix(in srgb, var(--income) 14%, transparent);
+  color: var(--income);
+}
+
+.recurrence-badge.muted {
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  color: var(--muted);
+}
+
 .inline-create-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2448,6 +2622,25 @@ tbody tr:last-child td {
     width: 100%;
     min-width: 0;
     max-width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .recurrence-toolbar,
+  .recurrence-card,
+  .recurrence-card-main,
+  .recurrence-form-actions {
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
+    flex-direction: column;
+  }
+
+  .recurrence-card-main > strong {
+    font-size: 1.1rem;
+  }
+
+  .recurrence-card-actions,
+  .recurrence-form-actions {
+    display: grid;
     grid-template-columns: minmax(0, 1fr);
   }
 

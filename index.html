@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=49" />
+    <link rel="stylesheet" href="./styles.css?v=50" />
   </head>
   <body>
     <main class="app-shell">
@@ -118,6 +118,7 @@
 
             <div id="registrationTabs" class="view-tabs compact-tabs">
               <button class="tab-button active" type="button" data-registration-tab="entry">Novo lançamento</button>
+              <button class="tab-button" type="button" data-registration-tab="recurrences">Recorrências</button>
               <button class="tab-button" type="button" data-registration-tab="incomeSources">Cadastros Gerais</button>
               <button class="tab-button" type="button" data-registration-tab="name">Nome da planilha</button>
             </div>
@@ -211,6 +212,80 @@
                 <span>Nome da planilha</span>
                 <input id="ownerName" type="text" value="Minha Planilha" placeholder="Digite um nome" />
               </label>
+            </section>
+
+            <section id="recurrencesPanel" class="registration-tab-panel recurrences-panel hidden">
+              <div class="recurrence-toolbar">
+                <div>
+                  <p class="eyebrow">Lançamentos automáticos</p>
+                  <h3>Recorrências mensais</h3>
+                </div>
+                <button id="generateRecurrences" class="primary" type="button">Gerar mês selecionado</button>
+              </div>
+              <p id="recurrenceStatus" class="recurrence-status" role="status"></p>
+              <form id="recurrenceForm" class="entry-form recurrence-form">
+                <input id="recurrenceEditingId" type="hidden" />
+                <label class="field">
+                  <span>Tipo</span>
+                  <select id="recurrenceType" required>
+                    <option value="Despesa">Despesa</option>
+                    <option value="Receita">Receita</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Dia do mês</span>
+                  <input id="recurrenceDay" type="number" min="1" max="31" value="1" required />
+                </label>
+                <label class="field wide">
+                  <span>Descrição</span>
+                  <input id="recurrenceDescription" type="text" placeholder="Ex.: Aluguel, salário, mensalidade" required />
+                </label>
+                <label class="field">
+                  <span>Categoria</span>
+                  <select id="recurrenceCategory" required></select>
+                </label>
+                <label class="field">
+                  <span>Origem da receita</span>
+                  <select id="recurrenceIncomeSource" required></select>
+                </label>
+                <label class="field">
+                  <span>Forma de pagamento</span>
+                  <select id="recurrencePayment" required></select>
+                </label>
+                <label class="field">
+                  <span>Conta</span>
+                  <select id="recurrenceAccount" required></select>
+                </label>
+                <label class="field">
+                  <span>Moeda</span>
+                  <select id="recurrenceCurrency" required>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="BRL">BRL (R$)</option>
+                    <option value="USD">USD ($)</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Valor</span>
+                  <input id="recurrenceAmount" type="number" min="0.01" step="0.01" placeholder="0,00" required />
+                </label>
+                <label class="field">
+                  <span>Início</span>
+                  <input id="recurrenceStart" type="month" required />
+                </label>
+                <label class="field">
+                  <span>Fim opcional</span>
+                  <input id="recurrenceEnd" type="month" />
+                </label>
+                <label class="field wide">
+                  <span>Observações</span>
+                  <input id="recurrenceNotes" type="text" placeholder="Opcional" />
+                </label>
+                <div class="recurrence-form-actions wide">
+                  <button id="cancelRecurrenceEdit" class="secondary hidden" type="button">Cancelar edição</button>
+                  <button class="primary" type="submit">Salvar recorrência</button>
+                </div>
+              </form>
+              <div id="recurrencesList" class="recurrences-list"></div>
             </section>
 
             <section id="incomeSourcesPanel" class="registration-tab-panel income-sources-panel hidden">
@@ -548,6 +623,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=49"></script>
+    <script src="./app.js?v=50"></script>
   </body>
 </html>
