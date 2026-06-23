@@ -562,6 +562,8 @@ select:focus {
 
 .sync-button {
   gap: 9px;
+  align-self: end;
+  margin-top: calc(0.76rem + 6px);
 }
 
 .sync-indicator {
@@ -575,6 +577,7 @@ select:focus {
 .sync-button.connected .sync-indicator {
   background: var(--income);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--income) 16%, transparent);
+  animation: sync-active-pulse 2.2s ease-in-out infinite;
 }
 
 .sync-button.syncing .sync-indicator {
@@ -588,6 +591,19 @@ select:focus {
 
 @keyframes sync-pulse {
   50% { opacity: 0.35; }
+}
+
+@keyframes sync-active-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--income) 16%, transparent);
+    transform: scale(1);
+  }
+
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--income) 6%, transparent);
+    transform: scale(1.06);
+  }
 }
 
 .secondary {
