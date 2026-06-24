@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=51" />
+    <link rel="stylesheet" href="./styles.css?v=52" />
   </head>
   <body>
     <main class="app-shell">
@@ -176,6 +176,10 @@
               <label class="field">
                 <span>Forma de pagamento</span>
                 <select id="payment" required></select>
+              </label>
+              <label id="creditInstallmentsField" class="field hidden">
+                <span>Parcelas do crédito</span>
+                <input id="creditInstallments" type="number" min="1" max="60" step="1" value="1" />
               </label>
               <div class="field">
                 <span>Conta</span>
@@ -623,6 +627,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=51"></script>
+    <script src="./app.js?v=52"></script>
   </body>
 </html>

@@ -24,7 +24,8 @@ const STATIC_TRANSLATIONS = {
   "Cancelar edição": "Cancel editing", "Novo lançamento": "New entry", "Cadastros Gerais": "General Records",
   "Nome da planilha": "Spreadsheet name", "Data": "Date", "Referente ao mês": "Reference month", "Tipo": "Type",
   "Receita": "Income", "Despesa": "Expense", "Origem da receita": "Income source", "Descrição": "Description",
-  "Categoria": "Category", "Forma de pagamento": "Payment method", "Formas de pagamento": "Payment methods", "Conta": "Account", "Valor": "Amount",
+  "Categoria": "Category", "Forma de pagamento": "Payment method", "Formas de pagamento": "Payment methods", "Crédito": "Credit",
+  "Parcelas do crédito": "Credit installments", "Conta": "Account", "Valor": "Amount",
   "Observações": "Notes", "Salvar lançamento": "Save entry", "Origens Receita": "Income Sources", "Contas": "Accounts",
   "Nova origem de receita": "New income source", "Adicionar": "Add", "Cópia completa": "Full copy",
   "Backup e recuperação": "Backup and recovery", "Baixar backup": "Download backup", "Restaurar backup": "Restore backup",
@@ -101,7 +102,9 @@ const DEFAULT_CATEGORIES = {
   Despesa: [],
 };
 
-const DEFAULT_PAYMENTS = [];
+const FIXED_PAYMENT_OPTIONS = ["Crédito"];
+const CREDIT_PAYMENT = "Crédito";
+const DEFAULT_PAYMENTS = [...FIXED_PAYMENT_OPTIONS];
 const DEFAULT_INCOME_SOURCES = ["Não se aplica"];
 const DEFAULT_ACCOUNTS = [];
 const NEW_USER_OWNER_NAME = "Minha Planilha";
@@ -253,6 +256,8 @@ const els = {
   description: document.querySelector("#description"),
   category: document.querySelector("#category"),
   payment: document.querySelector("#payment"),
+  creditInstallmentsField: document.querySelector("#creditInstallmentsField"),
+  creditInstallments: document.querySelector("#creditInstallments"),
   account: document.querySelector("#account"),
   currency: document.querySelector("#currency"),
   amount: document.querySelector("#amount"),
@@ -325,6 +330,7 @@ function init() {
   fillSelect(els.incomeSource, state.incomeSources);
   fillSelect(els.payment, state.payments);
   fillSelect(els.account, state.accounts);
+  updateCreditInstallmentField();
   refreshRecurrenceSelects();
   els.monthFilter.value = new Date().getMonth();
   els.yearFilter.value = new Date().getFullYear();
@@ -545,6 +551,7 @@ function bindEvents() {
     if (event.target === els.exchangeChartDialog) els.exchangeChartDialog.close();
   });
   els.entryForm.addEventListener("submit", saveEntry);
+  els.payment.addEventListener("change", updateCreditInstallmentField);
   els.recurrenceForm.addEventListener("submit", saveRecurrence);
   els.recurrenceType.addEventListener("change", updateRecurrenceIncomeSourceState);
   els.generateRecurrences.addEventListener("click", generateSelectedMonthRecurrences);
@@ -1302,7 +1309,7 @@ function loadState(storageKey = activeStorageKey) {
       entries: [],
       recurrences: [],
       accounts: DEFAULT_ACCOUNTS,
-      payments: DEFAULT_PAYMENTS,
+      payments: normalizePayments(DEFAULT_PAYMENTS),
       incomeSources: DEFAULT_INCOME_SOURCES,
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       ownerName: NEW_USER_OWNER_NAME,
@@ -1327,7 +1334,7 @@ function loadState(storageKey = activeStorageKey) {
       entries: Array.isArray(parsed.entries) ? parsed.entries : [],
       recurrences: Array.isArray(parsed.recurrences) ? parsed.recurrences : [],
       accounts: Array.isArray(parsed.accounts) ? parsed.accounts : DEFAULT_ACCOUNTS,
-      payments: Array.isArray(parsed.payments) ? parsed.payments : DEFAULT_PAYMENTS,
+      payments: Array.isArray(parsed.payments) ? normalizePayments(parsed.payments) : normalizePayments(DEFAULT_PAYMENTS),
       incomeSources: Array.isArray(parsed.incomeSources) ? normalizeIncomeSources(parsed.incomeSources) : DEFAULT_INCOME_SOURCES,
       categories: parsed.categories && typeof parsed.categories === "object" ? parsed.categories : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       ownerName: typeof parsed.ownerName === "string" && parsed.ownerName.trim() ? parsed.ownerName : NEW_USER_OWNER_NAME,
@@ -1349,7 +1356,7 @@ function loadState(storageKey = activeStorageKey) {
       entries: [],
       recurrences: [],
       accounts: DEFAULT_ACCOUNTS,
-      payments: DEFAULT_PAYMENTS,
+      payments: normalizePayments(DEFAULT_PAYMENTS),
       incomeSources: DEFAULT_INCOME_SOURCES,
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       ownerName: NEW_USER_OWNER_NAME,
@@ -1641,7 +1648,7 @@ function applyRemoteState(remote) {
   state.entries = Array.isArray(remote.entries) ? remote.entries : [];
   state.recurrences = Array.isArray(remote.recurrences) ? remote.recurrences : [];
   state.accounts = Array.isArray(remote.accounts) ? remote.accounts : [...DEFAULT_ACCOUNTS];
-  state.payments = Array.isArray(remote.payments) ? remote.payments : [...DEFAULT_PAYMENTS];
+  state.payments = Array.isArray(remote.payments) ? normalizePayments(remote.payments) : normalizePayments(DEFAULT_PAYMENTS);
   state.incomeSources = Array.isArray(remote.incomeSources) ? normalizeIncomeSources(remote.incomeSources) : [...DEFAULT_INCOME_SOURCES];
   state.categories = remote.categories && typeof remote.categories === "object" ? remote.categories : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
   state.ownerName = typeof remote.ownerName === "string" && remote.ownerName.trim() ? remote.ownerName : NEW_USER_OWNER_NAME;
@@ -1760,6 +1767,11 @@ function refreshRecurrenceSelects() {
 function normalizeIncomeSources(values) {
   const cleanValues = values.map((value) => String(value).trim()).filter(Boolean);
   return [...new Set([...cleanValues, "Não se aplica"])];
+}
+
+function normalizePayments(values) {
+  const cleanValues = values.map((value) => String(value).trim()).filter(Boolean);
+  return [...new Set([...FIXED_PAYMENT_OPTIONS, ...cleanValues])];
 }
 
 function ui(portuguese, english) {
@@ -2041,6 +2053,15 @@ function renderMarketTicker() {
 
 function dateKey(date) {
   return date.toISOString().slice(0, 10);
+}
+
+function addCalendarMonthsToDate(dateString, months) {
+  const source = new Date(`${dateString}T00:00:00Z`);
+  const desiredDay = source.getUTCDate();
+  const result = new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth() + months, 1));
+  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+  result.setUTCDate(Math.min(desiredDay, lastDay));
+  return dateKey(result);
 }
 
 function subtractCalendarMonths(date, months) {
@@ -2552,6 +2573,40 @@ function updateCategoryOptions() {
   }
 }
 
+function isCreditPayment(payment) {
+  const value = normalizedValue(payment);
+  return value === normalizedValue(CREDIT_PAYMENT) || value.includes("credito") || value.includes("credit");
+}
+
+function updateCreditInstallmentField() {
+  const active = isCreditPayment(els.payment.value);
+  els.creditInstallmentsField.classList.toggle("hidden", !active);
+  els.creditInstallments.required = active;
+  if (!active) els.creditInstallments.value = 1;
+}
+
+function creditInstallmentCount() {
+  if (!isCreditPayment(els.payment.value)) return 1;
+  return Math.max(1, Math.min(60, Math.floor(Number(els.creditInstallments.value) || 1)));
+}
+
+function installmentAmount(total, count, index) {
+  const totalCents = Math.round(Number(total || 0) * 100);
+  const baseCents = Math.floor(totalCents / count);
+  const cents = index === count - 1 ? totalCents - baseCents * (count - 1) : baseCents;
+  return cents / 100;
+}
+
+function installmentDescription(description, index, count) {
+  if (count <= 1) return description;
+  return `${description} (${index + 1}/${count})`;
+}
+
+function installmentNotes(notes, index, count) {
+  const tag = ui(`Parcela ${index + 1}/${count} do credito`, `Credit installment ${index + 1}/${count}`);
+  return notes ? `${notes} - ${tag}` : tag;
+}
+
 function selectedMonth() {
   return Number(els.monthFilter.value);
 }
@@ -2783,6 +2838,8 @@ async function saveEntry(event) {
     alert(ui("Não foi possível obter a cotação. Conecte-se à internet e tente novamente.", "Could not obtain the exchange rate. Connect to the internet and try again."));
     return;
   }
+  const installmentCount = creditInstallmentCount();
+  const installmentGroupId = !els.editingId.value && installmentCount > 1 ? crypto.randomUUID() : "";
   const data = {
     id: els.editingId.value || crypto.randomUUID(),
     date: els.date.value,
@@ -2799,11 +2856,29 @@ async function saveEntry(event) {
     rateDate: rateResult?.rateDate || els.date.value,
     receiptReference: els.receiptReference.value.trim(),
     notes: els.notes.value.trim(),
+    installmentGroupId: installmentGroupId || "",
+    installmentNumber: installmentCount > 1 ? 1 : 0,
+    installmentTotal: installmentCount > 1 ? installmentCount : 0,
   };
 
   if (els.editingId.value) {
     const index = state.entries.findIndex((item) => item.id === els.editingId.value);
     state.entries[index] = data;
+  } else if (installmentCount > 1) {
+    for (let index = 0; index < installmentCount; index += 1) {
+      const installmentDate = addCalendarMonthsToDate(els.date.value, index);
+      state.entries.push({
+        ...data,
+        id: index === 0 ? data.id : crypto.randomUUID(),
+        date: installmentDate,
+        referenceMonth: new Date(`${installmentDate}T00:00:00`).getMonth(),
+        description: installmentDescription(data.description, index, installmentCount),
+        amount: installmentAmount(data.amount, installmentCount, index),
+        notes: installmentNotes(data.notes, index, installmentCount),
+        installmentNumber: index + 1,
+        installmentTotal: installmentCount,
+      });
+    }
   } else {
     state.entries.push(data);
   }
@@ -2823,7 +2898,9 @@ function clearForm() {
   els.date.value = defaultDateForSelection();
   els.referenceMonth.value = els.monthFilter.value;
   els.currency.value = state.baseCurrency;
+  els.creditInstallments.value = 1;
   updateCategoryOptions();
+  updateCreditInstallmentField();
   updateConversionPreview();
 }
 
@@ -2843,6 +2920,7 @@ function editEntry(id) {
   els.category.value = item.category;
   ensurePaymentOption(item.payment);
   els.payment.value = item.payment;
+  els.creditInstallments.value = item.installmentTotal || 1;
   els.account.value = item.account;
   els.currency.value = item.currency || "BRL";
   els.amount.value = item.amount;
@@ -2851,6 +2929,7 @@ function editEntry(id) {
   els.cancelEdit.classList.remove("hidden");
   activeRegistrationTab = "entry";
   renderRegistrationTabs();
+  updateCreditInstallmentField();
   updateConversionPreview();
   els.entryForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -3141,9 +3220,10 @@ function addGeneralRegistrationItem(event) {
     els.account.value = cleanName;
     refreshRecurrenceSelects();
   } else if (activeSubRegistrationTab === "payments") {
-    state.payments = [...state.payments, cleanName];
+    state.payments = normalizePayments([...state.payments, cleanName]);
     fillSelect(els.payment, state.payments);
     els.payment.value = cleanName;
+    updateCreditInstallmentField();
     refreshRecurrenceSelects();
   } else {
     state.incomeSources = normalizeIncomeSources([...state.incomeSources, cleanName]);
@@ -3162,6 +3242,10 @@ function removeGeneralRegistrationItem(event) {
   const button = event.target.closest("button[data-general-item]");
   if (!button) return;
   const selectedItem = button.dataset.generalItem;
+  if (activeSubRegistrationTab === "payments" && FIXED_PAYMENT_OPTIONS.includes(selectedItem)) {
+    alert(ui('A opção "Crédito" é fixa e não pode ser removida.', 'The "Credit" option is fixed and cannot be removed.'));
+    return;
+  }
   if (!selectedItem || (activeSubRegistrationTab === "incomeSources" && selectedItem === "Não se aplica")) {
     alert(ui('A opção "Não se aplica" é fixa e não pode ser removida.', 'The "Not applicable" option is fixed and cannot be removed.'));
     return;
@@ -3178,8 +3262,9 @@ function removeGeneralRegistrationItem(event) {
     fillSelect(els.account, state.accounts);
     refreshRecurrenceSelects();
   } else if (activeSubRegistrationTab === "payments") {
-    state.payments = state.payments.filter((item) => item !== selectedItem);
+    state.payments = normalizePayments(state.payments.filter((item) => item !== selectedItem));
     fillSelect(els.payment, state.payments);
+    updateCreditInstallmentField();
     refreshRecurrenceSelects();
   } else {
     state.incomeSources = normalizeIncomeSources(state.incomeSources.filter((item) => item !== selectedItem));
@@ -3343,7 +3428,7 @@ function renderGeneralRegistrations() {
   els.incomeSourcesList.innerHTML = config.items
     .map((item) => {
       const isFixed = activeSubRegistrationTab === "incomeSources" && item === "Não se aplica";
-      const deleteButton = isFixed
+      const deleteButton = (isFixed || (activeSubRegistrationTab === "payments" && FIXED_PAYMENT_OPTIONS.includes(item)))
         ? `<span class="fixed-label">${ui("Fixo", "Fixed")}</span>`
         : `<button class="icon-danger" type="button" data-general-item="${escapeHtml(item)}" aria-label="Remover ${escapeHtml(item)}">🗑</button>`;
       return `
