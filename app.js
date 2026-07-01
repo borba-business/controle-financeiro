@@ -355,6 +355,10 @@ function init() {
   applyStaticTranslations();
   initializeAuth();
   initializeExchangeRates();
+  setInterval(initializeExchangeRates, 30 * 60 * 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) initializeExchangeRates();
+  });
 }
 
 function normalizeModuleOrder(order) {
@@ -1693,6 +1697,7 @@ function applyRemoteState(remote) {
   applyStaticTranslations();
   fillYearFilter(new Date().getFullYear());
   render();
+  initializeExchangeRates();
 }
 
 function friendlyAuthError(error) {
@@ -1851,12 +1856,17 @@ async function getRatesForDate(date) {
   const cacheKey = date || "latest";
   const todayKey = dateKey(new Date());
   const cachedRate = state.exchangeRatesCache[cacheKey];
+  const maxLatestCacheAge = 30 * 60 * 1000;
   if (cacheKey !== "latest" && cachedRate) return cachedRate;
-  if (cacheKey === "latest" && cachedRate?.fetchedOn === todayKey) return cachedRate;
+  if (
+    cacheKey === "latest"
+    && cachedRate?.fetchedOn === todayKey
+    && (cachedRate.rateDate === todayKey || (Date.now() - Number(cachedRate.fetchedAt || 0)) < maxLatestCacheAge)
+  ) return cachedRate;
 
   try {
     const result = await fetchExchangeRates(cacheKey);
-    state.exchangeRatesCache[cacheKey] = cacheKey === "latest" ? { ...result, fetchedOn: todayKey } : result;
+    state.exchangeRatesCache[cacheKey] = cacheKey === "latest" ? { ...result, fetchedOn: todayKey, fetchedAt: Date.now() } : result;
     saveLocalState();
     return state.exchangeRatesCache[cacheKey];
   } catch {
@@ -1982,9 +1992,13 @@ async function refreshMarketExtrasIfNeeded() {
 function renderMarketTicker() {
   els.marketTickerTrack.classList.toggle("market-ticker-ltr", state.tickerDirection === "ltr");
   const history = state.exchangeHistory?.rates || {};
-  const rows = Object.entries(history)
+  let rows = Object.entries(history)
     .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
     .filter(([, snapshot]) => snapshot && Number(snapshot.BRL) && Number(snapshot.USD));
+  const latestRate = state.exchangeRatesCache.latest;
+  if (latestRate?.rates && latestRate.rateDate && (!rows.length || latestRate.rateDate > rows.at(-1)[0])) {
+    rows = [...rows, [latestRate.rateDate, latestRate.rates]];
+  }
 
   if (rows.length < 2) {
     els.marketTickerTrack.innerHTML = `<span class="market-ticker-loading">${ui("Consultando cotações do mercado...", "Loading market rates...")}</span>`;
@@ -2023,9 +2037,13 @@ function renderMarketTicker() {
 function renderMarketTicker() {
   els.marketTickerTrack.classList.toggle("market-ticker-ltr", state.tickerDirection === "ltr");
   const history = state.exchangeHistory?.rates || {};
-  const rows = Object.entries(history)
+  let rows = Object.entries(history)
     .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
     .filter(([, snapshot]) => snapshot && Number(snapshot.BRL) && Number(snapshot.USD));
+  const latestRate = state.exchangeRatesCache.latest;
+  if (latestRate?.rates && latestRate.rateDate && (!rows.length || latestRate.rateDate > rows.at(-1)[0])) {
+    rows = [...rows, [latestRate.rateDate, latestRate.rates]];
+  }
 
   if (rows.length < 2) {
     els.marketTickerTrack.innerHTML = `<span class="market-ticker-loading">${ui("Consultando cotações do mercado...", "Loading market rates...")}</span>`;
@@ -2131,8 +2149,18 @@ async function loadExchangeHistory(force = false) {
   const todayKey = dateKey(new Date());
   const { startDate, endDate } = getExchangeDateRange();
   const rangeKey = `${startDate}:${endDate}`;
+  const latestCachedDate = state.exchangeHistory?.rates
+    ? Object.keys(state.exchangeHistory.rates).sort().at(-1)
+    : "";
+  const maxHistoryCacheAge = 30 * 60 * 1000;
 
-  if (!force && state.exchangeHistory?.fetchedOn === todayKey && state.exchangeHistory?.rangeKey === rangeKey && state.exchangeHistory?.rates) {
+  if (
+    !force
+    && state.exchangeHistory?.fetchedOn === todayKey
+    && state.exchangeHistory?.rangeKey === rangeKey
+    && state.exchangeHistory?.rates
+    && (latestCachedDate === endDate || (Date.now() - Number(state.exchangeHistory.fetchedAt || 0)) < maxHistoryCacheAge)
+  ) {
     renderExchangeChart();
     return;
   }
@@ -2145,7 +2173,7 @@ async function loadExchangeHistory(force = false) {
     const response = await fetch(`https://api.frankfurter.dev/v1/${apiStartDate}..${endDate}?from=EUR&to=BRL,USD`, { cache: "no-store" });
     if (!response.ok) throw new Error("Histórico indisponível");
     const data = await response.json();
-    state.exchangeHistory = { fetchedOn: todayKey, rangeKey, startDate, endDate, rates: data.rates || {} };
+    state.exchangeHistory = { fetchedOn: todayKey, fetchedAt: Date.now(), rangeKey, startDate, endDate, rates: data.rates || {} };
     saveLocalState();
   } catch {
     if (state.exchangeHistory?.rangeKey !== rangeKey) {

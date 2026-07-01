@@ -108,9 +108,11 @@ button {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: stretch;
+  max-width: 100%;
   min-height: 48px;
   margin: -8px 0 24px;
   overflow: hidden;
+  overflow-x: clip;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
@@ -141,7 +143,9 @@ button {
 
 .market-ticker-viewport {
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
+  overflow-x: clip;
   mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent);
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -154,10 +158,11 @@ button {
 
 .market-ticker-track {
   display: flex;
+  flex: 0 0 auto;
   width: max-content;
   max-width: none;
   min-height: 100%;
-  overflow: visible;
+  overflow: hidden;
   animation: market-ticker-scroll 54s linear infinite;
   will-change: transform;
 }
