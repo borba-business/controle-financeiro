@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=53" />
+    <link rel="stylesheet" href="./styles.css?v=54" />
   </head>
   <body>
     <main class="app-shell">
@@ -562,11 +562,29 @@
             <input id="authPassword" type="password" autocomplete="current-password" minlength="6" required />
           </label>
           <p id="authMessage" class="auth-message" role="status"></p>
+          <button id="forgotPassword" class="text-button auth-forgot" type="button">Esqueci minha senha</button>
           <div class="auth-actions">
             <button id="createAccount" class="secondary" type="button">Criar conta</button>
             <button id="signIn" class="primary" type="submit">Entrar</button>
           </div>
         </form>
+
+        <section id="authResetPanel" class="auth-reset-panel hidden">
+          <p class="auth-reset-copy">Digite uma nova senha para sua conta.</p>
+          <label>
+            Nova senha
+            <input id="authNewPassword" type="password" autocomplete="new-password" minlength="6" />
+          </label>
+          <label>
+            Confirmar nova senha
+            <input id="authConfirmPassword" type="password" autocomplete="new-password" minlength="6" />
+          </label>
+          <p id="authResetMessage" class="auth-message" role="status"></p>
+          <div class="auth-actions">
+            <button id="cancelPasswordReset" class="secondary" type="button">Cancelar</button>
+            <button id="updatePassword" class="primary" type="button">Salvar nova senha</button>
+          </div>
+        </section>
 
         <section id="authAccount" class="auth-account hidden">
           <div class="account-summary">
@@ -627,6 +645,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=53"></script>
+    <script src="./app.js?v=54"></script>
   </body>
 </html>

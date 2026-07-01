@@ -35,7 +35,8 @@ const STATIC_TRANSLATIONS = {
   "Buscar": "Search", "Todos": "All", "Referente": "Reference", "Forma": "Method", "Ação irreversível": "Irreversible action",
   "Limpar toda a planilha?": "Clear the entire spreadsheet?", "Cancelar": "Cancel", "Apagar lançamentos": "Delete entries",
   "Sincronização segura": "Secure synchronization", "Acessar seus dados": "Access your data", "E-mail": "Email", "Senha": "Password",
-  "Criar conta": "Create account", "Entrar": "Sign in", "Conta conectada": "Connected account", "Sincronização pronta": "Sync ready",
+  "Criar conta": "Create account", "Entrar": "Sign in", "Esqueci minha senha": "Forgot my password", "Nova senha": "New password",
+  "Confirmar nova senha": "Confirm new password", "Salvar nova senha": "Save new password", "Conta conectada": "Connected account", "Sincronização pronta": "Sync ready",
   "Sair": "Sign out", "Sincronizar agora": "Sync now", "Gráfico Cotações Tempo Real": "Real-Time Exchange Rate Chart",
   "Par de moedas": "Currency pair", "Período": "Period", "1 mês": "1 month", "3 meses": "3 months", "6 meses": "6 months", "1 ano": "1 year",
   "Personalizado": "Custom", "Data inicial": "Start date", "Data final": "End date", "Pesquisar": "Search",
@@ -139,6 +140,7 @@ const AI_RECEIPT_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/read-receipt`;
 let authSession = loadAuthSession();
 migrateLegacyAccountStorage(authSession?.user?.id);
 let activeStorageKey = authSession?.user?.id ? accountStorageKey(authSession.user.id) : STORAGE_KEY;
+let authRecoveryMode = false;
 const state = loadState(activeStorageKey);
 let activeHistoryFilter = "all";
 let activeVisualTab = "overview";
@@ -195,6 +197,13 @@ const els = {
   authEmail: document.querySelector("#authEmail"),
   authPassword: document.querySelector("#authPassword"),
   authMessage: document.querySelector("#authMessage"),
+  forgotPassword: document.querySelector("#forgotPassword"),
+  authResetPanel: document.querySelector("#authResetPanel"),
+  authNewPassword: document.querySelector("#authNewPassword"),
+  authConfirmPassword: document.querySelector("#authConfirmPassword"),
+  authResetMessage: document.querySelector("#authResetMessage"),
+  cancelPasswordReset: document.querySelector("#cancelPasswordReset"),
+  updatePassword: document.querySelector("#updatePassword"),
   createAccount: document.querySelector("#createAccount"),
   authAccount: document.querySelector("#authAccount"),
   authAccountEmail: document.querySelector("#authAccountEmail"),
@@ -604,6 +613,9 @@ function bindEvents() {
   els.closeAuthDialog.addEventListener("click", () => els.authDialog.close());
   els.authForm.addEventListener("submit", signIn);
   els.createAccount.addEventListener("click", createAccount);
+  els.forgotPassword.addEventListener("click", requestPasswordReset);
+  els.updatePassword.addEventListener("click", updateRecoveredPassword);
+  els.cancelPasswordReset.addEventListener("click", cancelPasswordReset);
   els.signOut.addEventListener("click", signOut);
   els.syncNow.addEventListener("click", syncNow);
   els.downloadBackup.addEventListener("click", downloadBackup);
@@ -1450,6 +1462,7 @@ async function consumeAuthRedirect() {
   const params = new URLSearchParams(location.hash.slice(1));
   const accessToken = params.get("access_token");
   if (!accessToken) return;
+  authRecoveryMode = params.get("type") === "recovery";
 
   saveAuthSession({
     access_token: accessToken,
@@ -1495,6 +1508,7 @@ async function initializeAuth() {
     if (session?.user?.id) {
       activateAccountStorage(session.user.id);
       await loadRemoteState();
+      if (authRecoveryMode) openAuthDialog();
     } else {
       activateGuestStorage();
     }
@@ -1508,15 +1522,22 @@ async function initializeAuth() {
 
 function openAuthDialog() {
   setAuthMessage("");
+  setAuthResetMessage("");
   updateAuthUi();
   els.authDialog.showModal();
-  if (!authSession) requestAnimationFrame(() => els.authEmail.focus());
+  if (authRecoveryMode) {
+    requestAnimationFrame(() => els.authNewPassword.focus());
+  } else if (!authSession) {
+    requestAnimationFrame(() => els.authEmail.focus());
+  }
 }
 
 function updateAuthUi() {
   const connected = Boolean(authSession?.user);
-  els.authForm.classList.toggle("hidden", connected);
-  els.authAccount.classList.toggle("hidden", !connected);
+  const recovering = authRecoveryMode && Boolean(authSession?.access_token);
+  els.authForm.classList.toggle("hidden", connected || recovering);
+  els.authResetPanel.classList.toggle("hidden", !recovering);
+  els.authAccount.classList.toggle("hidden", !connected || recovering);
   els.authButton.classList.toggle("connected", connected);
   els.authButtonLabel.textContent = connected ? ui("Sincronizado", "Synced") : ui("Entrar e sincronizar", "Sign in and sync");
   els.authAccountEmail.textContent = authSession?.user?.email || "";
@@ -1525,6 +1546,11 @@ function updateAuthUi() {
 function setAuthMessage(message, type = "") {
   els.authMessage.textContent = message;
   els.authMessage.className = `auth-message${type ? ` ${type}` : ""}`;
+}
+
+function setAuthResetMessage(message, type = "") {
+  els.authResetMessage.textContent = message;
+  els.authResetMessage.className = `auth-message${type ? ` ${type}` : ""}`;
 }
 
 function setSyncStatus(status, message) {
@@ -1585,6 +1611,79 @@ async function signIn(event) {
   } catch (error) {
     setAuthMessage(friendlyAuthError(error), "error");
   }
+}
+
+async function requestPasswordReset() {
+  const email = els.authEmail.value.trim();
+  if (!email) {
+    setAuthMessage("Informe seu e-mail para receber o link de recuperação.", "error");
+    els.authEmail.focus();
+    return;
+  }
+  if (!els.authEmail.checkValidity()) {
+    els.authEmail.reportValidity();
+    return;
+  }
+
+  els.forgotPassword.disabled = true;
+  setAuthMessage("Enviando e-mail de recuperação...");
+
+  try {
+    const redirectTo = "https://borba-business.github.io/controle-financeiro/";
+    await supabaseRequest(`/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
+      method: "POST",
+      token: false,
+      body: { email },
+    });
+    setAuthMessage("Enviamos um link para redefinir sua senha. Verifique seu e-mail.", "success");
+  } catch (error) {
+    setAuthMessage(friendlyAuthError(error), "error");
+  } finally {
+    els.forgotPassword.disabled = false;
+  }
+}
+
+async function updateRecoveredPassword() {
+  const password = els.authNewPassword.value;
+  const confirmation = els.authConfirmPassword.value;
+
+  if (password.length < 6) {
+    setAuthResetMessage("A nova senha precisa ter pelo menos 6 caracteres.", "error");
+    els.authNewPassword.focus();
+    return;
+  }
+  if (password !== confirmation) {
+    setAuthResetMessage("As senhas não conferem.", "error");
+    els.authConfirmPassword.focus();
+    return;
+  }
+
+  els.updatePassword.disabled = true;
+  setAuthResetMessage("Salvando nova senha...");
+
+  try {
+    await supabaseRequest("/auth/v1/user", {
+      method: "PUT",
+      body: { password },
+    });
+    authRecoveryMode = false;
+    els.authNewPassword.value = "";
+    els.authConfirmPassword.value = "";
+    updateAuthUi();
+    setSyncStatus("success", ui("Senha atualizada com sucesso", "Password updated successfully"));
+  } catch (error) {
+    setAuthResetMessage(friendlyAuthError(error), "error");
+  } finally {
+    els.updatePassword.disabled = false;
+  }
+}
+
+function cancelPasswordReset() {
+  authRecoveryMode = false;
+  els.authNewPassword.value = "";
+  els.authConfirmPassword.value = "";
+  setAuthResetMessage("");
+  updateAuthUi();
 }
 
 async function signOut() {

@@ -2350,10 +2350,52 @@ tbody tr:last-child td {
   gap: 16px;
 }
 
+.auth-reset-panel,
+.auth-reset-panel label {
+  display: grid;
+  gap: 9px;
+}
+
+.auth-reset-panel {
+  gap: 16px;
+}
+
 .auth-form label {
   color: var(--text);
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+.auth-reset-panel label {
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.auth-reset-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.text-button.auth-forgot {
+  justify-self: start;
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  box-shadow: none;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.text-button.auth-forgot:hover,
+.text-button.auth-forgot:focus-visible {
+  color: var(--text);
+  outline: none;
+  text-decoration: underline;
 }
 
 .auth-message {
