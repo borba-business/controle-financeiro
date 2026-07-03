@@ -1464,6 +1464,43 @@ function saveAuthSession(session) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
 }
 
+function profileFromUser(user) {
+  const metadata = user?.user_metadata || {};
+  const fullName = metadata.display_name || metadata.full_name || metadata.name || "";
+  const [firstNameFallback, ...lastNameFallback] = fullName.split(" ").filter(Boolean);
+  return {
+    first_name: metadata.first_name || firstNameFallback || "",
+    last_name: metadata.last_name || lastNameFallback.join(" ") || "",
+    full_name: fullName,
+    country: metadata.country || "",
+    country_code: metadata.country_code || "",
+    phone_country_dial_code: metadata.phone_country_dial_code || "",
+    phone: metadata.phone || "",
+    phone_e164_hint: metadata.phone_e164_hint || "",
+  };
+}
+
+async function saveUserProfile(user = authSession?.user) {
+  if (!user?.id) return;
+  const profile = profileFromUser(user);
+  if (!profile.full_name && !profile.country && !profile.phone) return;
+
+  try {
+    await supabaseRequest("/rest/v1/finance_profiles?on_conflict=user_id", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: {
+        user_id: user.id,
+        email: user.email || "",
+        ...profile,
+        updated_at: new Date().toISOString(),
+      },
+    });
+  } catch {
+    // The profile table is optional. If it has not been created yet, auth and sync still work normally.
+  }
+}
+
 function clearAuthSession() {
   authSession = null;
   localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -1687,6 +1724,7 @@ async function createAccount() {
     if (result.access_token) {
       saveAuthSession(result);
       activateAccountStorage(result.user.id);
+      await saveUserProfile(result.user);
       els.authPassword.value = "";
       updateAuthUi();
       await loadRemoteState();
@@ -1713,6 +1751,7 @@ async function signIn(event) {
     });
     saveAuthSession(session);
     activateAccountStorage(session.user.id);
+    await saveUserProfile(session.user);
     els.authPassword.value = "";
     updateAuthUi();
     await loadRemoteState();
