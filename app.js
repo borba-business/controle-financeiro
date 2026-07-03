@@ -169,6 +169,7 @@ let authSession = loadAuthSession();
 migrateLegacyAccountStorage(authSession?.user?.id);
 let activeStorageKey = authSession?.user?.id ? accountStorageKey(authSession.user.id) : STORAGE_KEY;
 let authRecoveryMode = false;
+let authSignupMode = false;
 const state = loadState(activeStorageKey);
 let activeHistoryFilter = "all";
 let activeVisualTab = "overview";
@@ -1595,6 +1596,7 @@ async function initializeAuth() {
 function openAuthDialog() {
   setAuthMessage("");
   setAuthResetMessage("");
+  authSignupMode = false;
   updateAuthUi();
   els.authDialog.showModal();
   if (authRecoveryMode) {
@@ -1610,6 +1612,7 @@ function updateAuthUi() {
   els.authForm.classList.toggle("hidden", connected || recovering);
   els.authResetPanel.classList.toggle("hidden", !recovering);
   els.authAccount.classList.toggle("hidden", !connected || recovering);
+  els.authSignupFields.classList.toggle("hidden", !authSignupMode || connected || recovering);
   els.authButton.classList.toggle("connected", connected);
   els.authButtonLabel.textContent = connected ? ui("Sincronizado", "Synced") : ui("Entrar e sincronizar", "Sign in and sync");
   els.authAccountEmail.textContent = accountDisplayName(authSession?.user);
@@ -1692,6 +1695,14 @@ function setSyncStatus(status, message) {
 }
 
 async function createAccount() {
+  if (!authSignupMode) {
+    authSignupMode = true;
+    setAuthMessage("");
+    updateAuthUi();
+    requestAnimationFrame(() => els.authFirstName.focus());
+    return;
+  }
+
   if (!els.authForm.reportValidity()) return;
   const profile = validateSignupProfile();
   if (!profile) return;
