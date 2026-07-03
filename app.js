@@ -90,6 +90,34 @@ Object.assign(STATIC_TRANSLATIONS, {
   "Selecionar e analisar": "Select and analyze",
 });
 
+Object.assign(STATIC_TRANSLATIONS, {
+  "Nome": "First name",
+  "Sobrenome": "Last name",
+  "País onde mora": "Country of residence",
+  "Telefone": "Phone",
+  "Número de telefone": "Phone number",
+  "Brasil": "Brazil",
+  "Portugal": "Portugal",
+  "Irlanda": "Ireland",
+  "Reino Unido": "United Kingdom",
+  "Estados Unidos": "United States",
+  "Espanha": "Spain",
+  "França": "France",
+  "Alemanha": "Germany",
+  "Itália": "Italy",
+  "Holanda": "Netherlands",
+  "Suíça": "Switzerland",
+  "Argentina": "Argentina",
+  "Uruguai": "Uruguay",
+  "Paraguai": "Paraguay",
+  "Chile": "Chile",
+  "Canadá": "Canada",
+  "Informe o nome para criar a conta.": "Enter the first name to create the account.",
+  "Informe o sobrenome para criar a conta.": "Enter the last name to create the account.",
+  "Selecione o país onde mora.": "Select the country of residence.",
+  "Criando sua conta...": "Creating your account...",
+});
+
 const PLACEHOLDER_TRANSLATIONS = {
   "Ex.: IPVA, UNIMED, mercado": "E.g.: tax, healthcare, groceries", "Opcional": "Optional", "Digite um nome": "Enter a name",
   "Ex.: Mercado, aluguel, cliente": "E.g.: store, rent, client", "Descrição, categoria, conta...": "Description, category, account..."
@@ -194,6 +222,12 @@ const els = {
   authDialog: document.querySelector("#authDialog"),
   closeAuthDialog: document.querySelector("#closeAuthDialog"),
   authForm: document.querySelector("#authForm"),
+  authSignupFields: document.querySelector("#authSignupFields"),
+  authFirstName: document.querySelector("#authFirstName"),
+  authLastName: document.querySelector("#authLastName"),
+  authCountry: document.querySelector("#authCountry"),
+  authPhoneDialCode: document.querySelector("#authPhoneDialCode"),
+  authPhone: document.querySelector("#authPhone"),
   authEmail: document.querySelector("#authEmail"),
   authPassword: document.querySelector("#authPassword"),
   authMessage: document.querySelector("#authMessage"),
@@ -613,6 +647,7 @@ function bindEvents() {
   els.closeAuthDialog.addEventListener("click", () => els.authDialog.close());
   els.authForm.addEventListener("submit", signIn);
   els.createAccount.addEventListener("click", createAccount);
+  els.authCountry.addEventListener("change", updateAuthPhoneDialCode);
   els.forgotPassword.addEventListener("click", requestPasswordReset);
   els.updatePassword.addEventListener("click", updateRecoveredPassword);
   els.cancelPasswordReset.addEventListener("click", cancelPasswordReset);
@@ -1540,7 +1575,8 @@ function updateAuthUi() {
   els.authAccount.classList.toggle("hidden", !connected || recovering);
   els.authButton.classList.toggle("connected", connected);
   els.authButtonLabel.textContent = connected ? ui("Sincronizado", "Synced") : ui("Entrar e sincronizar", "Sign in and sync");
-  els.authAccountEmail.textContent = authSession?.user?.email || "";
+  els.authAccountEmail.textContent = accountDisplayName(authSession?.user);
+  updateAuthPhoneDialCode();
 }
 
 function setAuthMessage(message, type = "") {
@@ -1551,6 +1587,62 @@ function setAuthMessage(message, type = "") {
 function setAuthResetMessage(message, type = "") {
   els.authResetMessage.textContent = message;
   els.authResetMessage.className = `auth-message${type ? ` ${type}` : ""}`;
+}
+
+function accountDisplayName(user) {
+  const metadata = user?.user_metadata || {};
+  return metadata.display_name || metadata.full_name || metadata.name || user?.email || "";
+}
+
+function selectedAuthCountry() {
+  const option = els.authCountry?.selectedOptions?.[0];
+  return {
+    code: els.authCountry?.value || "",
+    name: option?.textContent?.trim() || "",
+    dialCode: option?.dataset?.dial || "",
+  };
+}
+
+function updateAuthPhoneDialCode() {
+  if (!els.authPhoneDialCode) return;
+  els.authPhoneDialCode.textContent = selectedAuthCountry().dialCode || "";
+}
+
+function signupProfileData() {
+  const firstName = els.authFirstName.value.trim().replace(/\s+/g, " ");
+  const lastName = els.authLastName.value.trim().replace(/\s+/g, " ");
+  const country = selectedAuthCountry();
+  const phone = els.authPhone.value.trim().replace(/\s+/g, " ");
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  return {
+    firstName,
+    lastName,
+    fullName,
+    country,
+    phone,
+    fullPhone: phone ? `${country.dialCode} ${phone}`.trim() : "",
+  };
+}
+
+function validateSignupProfile() {
+  const profile = signupProfileData();
+  if (!profile.firstName) {
+    setAuthMessage(ui("Informe o nome para criar a conta.", "Enter the first name to create the account."), "error");
+    els.authFirstName.focus();
+    return null;
+  }
+  if (!profile.lastName) {
+    setAuthMessage(ui("Informe o sobrenome para criar a conta.", "Enter the last name to create the account."), "error");
+    els.authLastName.focus();
+    return null;
+  }
+  if (!profile.country.code) {
+    setAuthMessage(ui("Selecione o país onde mora.", "Select the country of residence."), "error");
+    els.authCountry.focus();
+    return null;
+  }
+  return profile;
 }
 
 function setSyncStatus(status, message) {
@@ -1564,7 +1656,9 @@ function setSyncStatus(status, message) {
 
 async function createAccount() {
   if (!els.authForm.reportValidity()) return;
-  setAuthMessage("Criando sua conta...");
+  const profile = validateSignupProfile();
+  if (!profile) return;
+  setAuthMessage(ui("Criando sua conta...", "Creating your account..."));
   els.createAccount.disabled = true;
 
   try {
@@ -1572,7 +1666,22 @@ async function createAccount() {
     const result = await supabaseRequest(`/auth/v1/signup?redirect_to=${encodeURIComponent(redirectTo)}`, {
       method: "POST",
       token: false,
-      body: { email: els.authEmail.value.trim(), password: els.authPassword.value },
+      body: {
+        email: els.authEmail.value.trim(),
+        password: els.authPassword.value,
+        data: {
+          display_name: profile.fullName,
+          name: profile.fullName,
+          full_name: profile.fullName,
+          first_name: profile.firstName,
+          last_name: profile.lastName,
+          country: profile.country.name,
+          country_code: profile.country.code,
+          phone_country_dial_code: profile.country.dialCode,
+          phone: profile.phone,
+          phone_e164_hint: profile.fullPhone,
+        },
+      },
     });
 
     if (result.access_token) {

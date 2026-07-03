@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=54" />
+    <link rel="stylesheet" href="./styles.css?v=55" />
   </head>
   <body>
     <main class="app-shell">
@@ -553,6 +553,46 @@
         </div>
 
         <form id="authForm" class="auth-form">
+          <div id="authSignupFields" class="auth-signup-fields">
+            <div class="auth-form-grid">
+              <label>
+                Nome
+                <input id="authFirstName" type="text" autocomplete="given-name" />
+              </label>
+              <label>
+                Sobrenome
+                <input id="authLastName" type="text" autocomplete="family-name" />
+              </label>
+            </div>
+            <label>
+              País onde mora
+              <select id="authCountry" autocomplete="country-name">
+                <option value="BR" data-dial="+55">Brasil</option>
+                <option value="PT" data-dial="+351">Portugal</option>
+                <option value="IE" data-dial="+353">Irlanda</option>
+                <option value="GB" data-dial="+44">Reino Unido</option>
+                <option value="US" data-dial="+1">Estados Unidos</option>
+                <option value="ES" data-dial="+34">Espanha</option>
+                <option value="FR" data-dial="+33">França</option>
+                <option value="DE" data-dial="+49">Alemanha</option>
+                <option value="IT" data-dial="+39">Itália</option>
+                <option value="NL" data-dial="+31">Holanda</option>
+                <option value="CH" data-dial="+41">Suíça</option>
+                <option value="AR" data-dial="+54">Argentina</option>
+                <option value="UY" data-dial="+598">Uruguai</option>
+                <option value="PY" data-dial="+595">Paraguai</option>
+                <option value="CL" data-dial="+56">Chile</option>
+                <option value="CA" data-dial="+1">Canadá</option>
+              </select>
+            </label>
+            <label>
+              Telefone <span class="optional-label">Opcional</span>
+              <div class="phone-field">
+                <span id="authPhoneDialCode" class="phone-dial-code">+55</span>
+                <input id="authPhone" type="tel" autocomplete="tel-national" inputmode="tel" placeholder="Número de telefone" />
+              </div>
+            </label>
+          </div>
           <label>
             E-mail
             <input id="authEmail" type="email" autocomplete="email" required />
@@ -645,6 +685,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=54"></script>
+    <script src="./app.js?v=55"></script>
   </body>
 </html>
