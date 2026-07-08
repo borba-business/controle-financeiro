@@ -347,6 +347,80 @@ body.utility-menu-open {
   min-width: 0;
 }
 
+.utility-account-section {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2), transparent 18%);
+}
+
+.utility-account-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.utility-account-heading h3,
+.utility-account-signed-out p,
+.profile-status {
+  margin: 0;
+}
+
+.utility-account-signed-out {
+  display: grid;
+  gap: 12px;
+}
+
+.utility-account-signed-out p,
+.profile-status {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.account-profile-form,
+.account-profile-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.account-profile-form {
+  gap: 12px;
+}
+
+.account-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.account-profile-form label {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.account-profile-form input,
+.account-profile-form select,
+.account-profile-form button {
+  width: 100%;
+  min-width: 0;
+}
+
+.account-profile-form input[readonly] {
+  color: var(--muted);
+}
+
+.profile-status.error {
+  color: var(--expense);
+}
+
+.profile-status.success {
+  color: var(--income);
+}
+
 .utility-menu-actions {
   display: grid;
   gap: 8px;
@@ -2587,6 +2661,7 @@ tbody tr:last-child td {
   }
 
   .auth-form-grid,
+  .account-profile-grid,
   .phone-field {
     grid-template-columns: 1fr;
   }

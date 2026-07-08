@@ -94,6 +94,10 @@ Object.assign(STATIC_TRANSLATIONS, {
   "Nome": "First name",
   "Sobrenome": "Last name",
   "País onde mora": "Country of residence",
+  "Perfil": "Profile",
+  "E-mail conectado": "Connected email",
+  "Entre e sincronize para editar seus dados.": "Sign in and sync to edit your details.",
+  "Salvar dados da conta": "Save account details",
   "Telefone": "Phone",
   "Número de telefone": "Phone number",
   "Brasil": "Brazil",
@@ -120,6 +124,9 @@ Object.assign(STATIC_TRANSLATIONS, {
   "Voltar": "Back",
   "A senha deve ter no mÃ­nimo 6 caracteres.": "The password must be at least 6 characters.",
   "As senhas nÃ£o conferem.": "The passwords do not match.",
+  "Preencha nome, sobrenome e país.": "Fill first name, last name and country.",
+  "Salvando dados da conta...": "Saving account details...",
+  "Dados da conta atualizados.": "Account details updated.",
 });
 
 const PLACEHOLDER_TRANSLATIONS = {
@@ -212,6 +219,17 @@ const els = {
   utilityMenu: document.querySelector("#utilityMenu"),
   utilityMenuClose: document.querySelector("#utilityMenuClose"),
   utilityMenuBackdrop: document.querySelector("#utilityMenuBackdrop"),
+  utilityAccountSignedOut: document.querySelector("#utilityAccountSignedOut"),
+  utilityOpenAuth: document.querySelector("#utilityOpenAuth"),
+  accountProfileForm: document.querySelector("#accountProfileForm"),
+  profileEmail: document.querySelector("#profileEmail"),
+  profileFirstName: document.querySelector("#profileFirstName"),
+  profileLastName: document.querySelector("#profileLastName"),
+  profileCountry: document.querySelector("#profileCountry"),
+  profilePhoneDialCode: document.querySelector("#profilePhoneDialCode"),
+  profilePhone: document.querySelector("#profilePhone"),
+  profileStatus: document.querySelector("#profileStatus"),
+  saveProfile: document.querySelector("#saveProfile"),
   marketTicker: document.querySelector("#marketTicker"),
   marketTickerTrack: document.querySelector("#marketTickerTrack"),
   openBackupPanel: document.querySelector("#openBackupPanel"),
@@ -641,6 +659,9 @@ function bindEvents() {
   els.utilityMenuToggle.addEventListener("click", openUtilityMenu);
   els.utilityMenuClose.addEventListener("click", closeUtilityMenu);
   els.utilityMenuBackdrop.addEventListener("click", closeUtilityMenu);
+  els.utilityOpenAuth?.addEventListener("click", openAuthFromUtilityMenu);
+  els.accountProfileForm?.addEventListener("submit", saveAccountProfile);
+  els.profileCountry?.addEventListener("change", updateProfilePhoneDialCode);
   els.openBackupPanel.addEventListener("click", openBackupFromUtilityMenu);
   els.closeBackupDialog.addEventListener("click", closeBackupDialog);
   els.backupDialog.addEventListener("click", (event) => {
@@ -1490,10 +1511,10 @@ function profileFromUser(user) {
   };
 }
 
-async function saveUserProfile(user = authSession?.user) {
+async function saveUserProfile(user = authSession?.user, profileOverride = null) {
   if (!user?.id) return;
-  const profile = profileFromUser(user);
-  if (!profile.full_name && !profile.country && !profile.phone) return;
+  const profile = profileOverride || profileFromUser(user);
+  if (!profileOverride && !profile.full_name && !profile.country && !profile.phone) return;
 
   try {
     await supabaseRequest("/rest/v1/finance_profiles?on_conflict=user_id", {
@@ -1626,6 +1647,7 @@ function updateAuthUi() {
   els.authButtonLabel.textContent = connected ? ui("Sincronizado", "Synced") : ui("Entrar e sincronizar", "Sign in and sync");
   els.authAccountEmail.textContent = accountDisplayName(authSession?.user);
   updateAuthPhoneDialCode();
+  updateUtilityAccountUi();
 }
 
 function setAuthSignupMode(enabled) {
@@ -1668,9 +1690,13 @@ function accountDisplayName(user) {
 }
 
 function selectedAuthCountry() {
-  const option = els.authCountry?.selectedOptions?.[0];
+  return selectedCountryFrom(els.authCountry);
+}
+
+function selectedCountryFrom(select) {
+  const option = select?.selectedOptions?.[0];
   return {
-    code: els.authCountry?.value || "",
+    code: select?.value || "",
     name: option?.textContent?.trim() || "",
     dialCode: option?.dataset?.dial || "",
   };
@@ -1679,6 +1705,149 @@ function selectedAuthCountry() {
 function updateAuthPhoneDialCode() {
   if (!els.authPhoneDialCode) return;
   els.authPhoneDialCode.textContent = selectedAuthCountry().dialCode || "";
+}
+
+function updateProfilePhoneDialCode() {
+  if (!els.profilePhoneDialCode) return;
+  els.profilePhoneDialCode.textContent = selectedCountryFrom(els.profileCountry).dialCode || "";
+}
+
+function setProfileStatus(message, type = "") {
+  if (!els.profileStatus) return;
+  els.profileStatus.textContent = message;
+  els.profileStatus.className = `profile-status${type ? ` ${type}` : ""}`;
+}
+
+function profileFormPayload() {
+  const firstName = els.profileFirstName.value.trim().replace(/\s+/g, " ");
+  const lastName = els.profileLastName.value.trim().replace(/\s+/g, " ");
+  const country = selectedCountryFrom(els.profileCountry);
+  const phone = els.profilePhone.value.trim().replace(/\s+/g, " ");
+  const fullName = `${firstName} ${lastName}`.trim();
+  return {
+    metadata: {
+      display_name: fullName,
+      name: fullName,
+      full_name: fullName,
+      first_name: firstName,
+      last_name: lastName,
+      country: country.name,
+      country_code: country.code,
+      phone_country_dial_code: country.dialCode,
+      phone,
+      phone_e164_hint: phone ? `${country.dialCode} ${phone}`.trim() : "",
+    },
+    profile: {
+      first_name: firstName,
+      last_name: lastName,
+      full_name: fullName,
+      country: country.name,
+      country_code: country.code,
+      phone_country_dial_code: country.dialCode,
+      phone,
+      phone_e164_hint: phone ? `${country.dialCode} ${phone}`.trim() : "",
+    },
+  };
+}
+
+function fillProfileFormFromProfile(profile = {}) {
+  if (!els.accountProfileForm) return;
+  els.profileEmail.value = authSession?.user?.email || "";
+  els.profileFirstName.value = profile.first_name || "";
+  els.profileLastName.value = profile.last_name || "";
+  if (profile.country_code && els.profileCountry.querySelector(`option[value="${profile.country_code}"]`)) {
+    els.profileCountry.value = profile.country_code;
+  } else {
+    els.profileCountry.value = "BR";
+  }
+  els.profilePhone.value = profile.phone || "";
+  updateProfilePhoneDialCode();
+}
+
+function mergeProfileData(base = {}, extra = {}) {
+  const merged = { ...base };
+  Object.entries(extra || {}).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && String(value).trim() !== "") {
+      merged[key] = value;
+    }
+  });
+  return merged;
+}
+
+async function loadAccountProfile() {
+  if (!authSession?.user?.id) return profileFromUser(authSession?.user);
+  const localProfile = profileFromUser(authSession.user);
+  try {
+    const rows = await supabaseRequest(`/rest/v1/finance_profiles?select=first_name,last_name,full_name,country,country_code,phone_country_dial_code,phone,phone_e164_hint&user_id=eq.${authSession.user.id}`);
+    const remoteProfile = Array.isArray(rows) ? rows[0] : null;
+    return mergeProfileData(localProfile, remoteProfile || {});
+  } catch {
+    return localProfile;
+  }
+}
+
+async function updateUtilityAccountUi() {
+  if (!els.utilityAccountSignedOut || !els.accountProfileForm) return;
+  const connected = Boolean(authSession?.user);
+  els.utilityAccountSignedOut.classList.toggle("hidden", connected);
+  els.accountProfileForm.classList.toggle("hidden", !connected);
+  els.accountProfileForm.hidden = !connected;
+  if (!connected) {
+    setProfileStatus("");
+    return;
+  }
+  fillProfileFormFromProfile(profileFromUser(authSession.user));
+  if (els.utilityMenu?.classList.contains("open")) {
+    fillProfileFormFromProfile(await loadAccountProfile());
+  }
+}
+
+function openAuthFromUtilityMenu() {
+  closeUtilityMenu();
+  openAuthDialog();
+}
+
+async function saveAccountProfile(event) {
+  event.preventDefault();
+  if (!authSession?.user?.id) {
+    setProfileStatus(ui("Entre e sincronize para editar seus dados.", "Sign in and sync to edit your details."), "error");
+    return;
+  }
+  if (!els.accountProfileForm.reportValidity()) return;
+
+  const { metadata, profile } = profileFormPayload();
+  if (!profile.first_name || !profile.last_name || !profile.country_code) {
+    setProfileStatus(ui("Preencha nome, sobrenome e país.", "Fill first name, last name and country."), "error");
+    return;
+  }
+
+  els.saveProfile.disabled = true;
+  setProfileStatus(ui("Salvando dados da conta...", "Saving account details..."));
+
+  try {
+    const updated = await supabaseRequest("/auth/v1/user", {
+      method: "PUT",
+      body: { data: metadata },
+    });
+    const updatedUser = updated?.user || updated || {};
+    authSession.user = {
+      ...authSession.user,
+      ...updatedUser,
+      user_metadata: {
+        ...(authSession.user.user_metadata || {}),
+        ...(updatedUser.user_metadata || {}),
+        ...metadata,
+      },
+    };
+    saveAuthSession(authSession);
+    await saveUserProfile(authSession.user, profile);
+    updateAuthUi();
+    setProfileStatus(ui("Dados da conta atualizados.", "Account details updated."), "success");
+  } catch (error) {
+    setProfileStatus(friendlyAuthError(error), "error");
+  } finally {
+    els.saveProfile.disabled = false;
+  }
 }
 
 function signupProfileData() {
@@ -3646,6 +3815,7 @@ function openUtilityMenu() {
   els.utilityMenuBackdrop.classList.add("open");
   els.utilityMenu.setAttribute("aria-hidden", "false");
   els.utilityMenuToggle.setAttribute("aria-expanded", "true");
+  updateUtilityAccountUi();
   requestAnimationFrame(() => els.utilityMenuClose.focus());
 }
 

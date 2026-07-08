@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=59" />
+    <link rel="stylesheet" href="./styles.css?v=60" />
   </head>
   <body>
     <main class="app-shell">
@@ -463,6 +463,62 @@
           </select>
         </label>
       </div>
+      <section class="utility-account-section" aria-labelledby="utilityAccountTitle">
+        <div class="utility-account-heading">
+          <p class="eyebrow">Perfil</p>
+          <h3 id="utilityAccountTitle">Conta</h3>
+        </div>
+        <div id="utilityAccountSignedOut" class="utility-account-signed-out">
+          <p>Entre e sincronize para editar seus dados.</p>
+          <button id="utilityOpenAuth" class="secondary" type="button">Entrar e sincronizar</button>
+        </div>
+        <form id="accountProfileForm" class="account-profile-form hidden" hidden>
+          <label>
+            E-mail conectado
+            <input id="profileEmail" type="email" readonly />
+          </label>
+          <div class="account-profile-grid">
+            <label>
+              Nome
+              <input id="profileFirstName" type="text" autocomplete="given-name" required />
+            </label>
+            <label>
+              Sobrenome
+              <input id="profileLastName" type="text" autocomplete="family-name" required />
+            </label>
+          </div>
+          <label>
+            País onde mora
+            <select id="profileCountry" autocomplete="country-name" required>
+              <option value="BR" data-dial="+55">Brasil</option>
+              <option value="PT" data-dial="+351">Portugal</option>
+              <option value="IE" data-dial="+353">Irlanda</option>
+              <option value="GB" data-dial="+44">Reino Unido</option>
+              <option value="US" data-dial="+1">Estados Unidos</option>
+              <option value="ES" data-dial="+34">Espanha</option>
+              <option value="FR" data-dial="+33">França</option>
+              <option value="DE" data-dial="+49">Alemanha</option>
+              <option value="IT" data-dial="+39">Itália</option>
+              <option value="NL" data-dial="+31">Holanda</option>
+              <option value="CH" data-dial="+41">Suíça</option>
+              <option value="AR" data-dial="+54">Argentina</option>
+              <option value="UY" data-dial="+598">Uruguai</option>
+              <option value="PY" data-dial="+595">Paraguai</option>
+              <option value="CL" data-dial="+56">Chile</option>
+              <option value="CA" data-dial="+1">Canadá</option>
+            </select>
+          </label>
+          <label>
+            Telefone <span class="optional-label">Opcional</span>
+            <div class="phone-field">
+              <span id="profilePhoneDialCode" class="phone-dial-code">+55</span>
+              <input id="profilePhone" type="tel" autocomplete="tel-national" inputmode="tel" placeholder="Número de telefone" />
+            </div>
+          </label>
+          <p id="profileStatus" class="profile-status" role="status"></p>
+          <button id="saveProfile" class="primary" type="submit">Salvar dados da conta</button>
+        </form>
+      </section>
       <nav class="utility-menu-actions" aria-label="Ações da planilha">
         <button id="exportCsv" class="utility-action" type="button">
           <span class="utility-action-icon" aria-hidden="true">CSV</span>
@@ -690,6 +746,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=59"></script>
+    <script src="./app.js?v=60"></script>
   </body>
 </html>
