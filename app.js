@@ -1596,7 +1596,7 @@ async function initializeAuth() {
 function openAuthDialog() {
   setAuthMessage("");
   setAuthResetMessage("");
-  authSignupMode = false;
+  setAuthSignupMode(false);
   updateAuthUi();
   els.authDialog.showModal();
   if (authRecoveryMode) {
@@ -1612,11 +1612,18 @@ function updateAuthUi() {
   els.authForm.classList.toggle("hidden", connected || recovering);
   els.authResetPanel.classList.toggle("hidden", !recovering);
   els.authAccount.classList.toggle("hidden", !connected || recovering);
-  els.authSignupFields.classList.toggle("hidden", !authSignupMode || connected || recovering);
+  setAuthSignupMode(authSignupMode && !connected && !recovering);
   els.authButton.classList.toggle("connected", connected);
   els.authButtonLabel.textContent = connected ? ui("Sincronizado", "Synced") : ui("Entrar e sincronizar", "Sign in and sync");
   els.authAccountEmail.textContent = accountDisplayName(authSession?.user);
   updateAuthPhoneDialCode();
+}
+
+function setAuthSignupMode(enabled) {
+  authSignupMode = Boolean(enabled);
+  els.authForm?.classList.toggle("signup-mode", authSignupMode);
+  els.authSignupFields?.classList.toggle("hidden", !authSignupMode);
+  if (els.authSignupFields) els.authSignupFields.hidden = !authSignupMode;
 }
 
 function setAuthMessage(message, type = "") {
@@ -1696,7 +1703,7 @@ function setSyncStatus(status, message) {
 
 async function createAccount() {
   if (!authSignupMode) {
-    authSignupMode = true;
+    setAuthSignupMode(true);
     setAuthMessage("");
     updateAuthUi();
     requestAnimationFrame(() => els.authFirstName.focus());

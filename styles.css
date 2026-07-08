@@ -2359,6 +2359,11 @@ tbody tr:last-child td {
   background: color-mix(in srgb, var(--surface-2), transparent 18%);
 }
 
+.auth-signup-fields[hidden],
+.auth-form:not(.signup-mode) .auth-signup-fields {
+  display: none !important;
+}
+
 .auth-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
