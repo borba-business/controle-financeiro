@@ -116,6 +116,10 @@ Object.assign(STATIC_TRANSLATIONS, {
   "Informe o sobrenome para criar a conta.": "Enter the last name to create the account.",
   "Selecione o país onde mora.": "Select the country of residence.",
   "Criando sua conta...": "Creating your account...",
+  "Confirmar senha": "Confirm password",
+  "Voltar": "Back",
+  "A senha deve ter no mÃ­nimo 6 caracteres.": "The password must be at least 6 characters.",
+  "As senhas nÃ£o conferem.": "The passwords do not match.",
 });
 
 const PLACEHOLDER_TRANSLATIONS = {
@@ -231,6 +235,8 @@ const els = {
   authPhone: document.querySelector("#authPhone"),
   authEmail: document.querySelector("#authEmail"),
   authPassword: document.querySelector("#authPassword"),
+  authSignupConfirmPasswordField: document.querySelector("#authSignupConfirmPasswordField"),
+  authSignupConfirmPassword: document.querySelector("#authSignupConfirmPassword"),
   authMessage: document.querySelector("#authMessage"),
   forgotPassword: document.querySelector("#forgotPassword"),
   authResetPanel: document.querySelector("#authResetPanel"),
@@ -240,6 +246,8 @@ const els = {
   cancelPasswordReset: document.querySelector("#cancelPasswordReset"),
   updatePassword: document.querySelector("#updatePassword"),
   createAccount: document.querySelector("#createAccount"),
+  backToSignIn: document.querySelector("#backToSignIn"),
+  signIn: document.querySelector("#signIn"),
   authAccount: document.querySelector("#authAccount"),
   authAccountEmail: document.querySelector("#authAccountEmail"),
   cloudSyncStatus: document.querySelector("#cloudSyncStatus"),
@@ -648,6 +656,7 @@ function bindEvents() {
   els.closeAuthDialog.addEventListener("click", () => els.authDialog.close());
   els.authForm.addEventListener("submit", signIn);
   els.createAccount.addEventListener("click", createAccount);
+  els.backToSignIn.addEventListener("click", backToSignIn);
   els.authCountry.addEventListener("change", updateAuthPhoneDialCode);
   els.forgotPassword.addEventListener("click", requestPasswordReset);
   els.updatePassword.addEventListener("click", updateRecoveredPassword);
@@ -1624,6 +1633,23 @@ function setAuthSignupMode(enabled) {
   els.authForm?.classList.toggle("signup-mode", authSignupMode);
   els.authSignupFields?.classList.toggle("hidden", !authSignupMode);
   if (els.authSignupFields) els.authSignupFields.hidden = !authSignupMode;
+  els.authSignupConfirmPasswordField?.classList.toggle("hidden", !authSignupMode);
+  if (els.authSignupConfirmPasswordField) els.authSignupConfirmPasswordField.hidden = !authSignupMode;
+  if (els.authSignupConfirmPassword) {
+    els.authSignupConfirmPassword.required = authSignupMode;
+    if (!authSignupMode) els.authSignupConfirmPassword.value = "";
+  }
+  if (els.authPassword) els.authPassword.autocomplete = authSignupMode ? "new-password" : "current-password";
+  els.backToSignIn?.classList.toggle("hidden", !authSignupMode);
+  if (els.backToSignIn) els.backToSignIn.hidden = !authSignupMode;
+  els.forgotPassword?.classList.toggle("hidden", authSignupMode);
+  els.signIn?.classList.toggle("hidden", authSignupMode);
+}
+
+function backToSignIn() {
+  setAuthMessage("");
+  setAuthSignupMode(false);
+  requestAnimationFrame(() => els.authEmail.focus());
 }
 
 function setAuthMessage(message, type = "") {
@@ -1692,6 +1718,22 @@ function validateSignupProfile() {
   return profile;
 }
 
+function validateSignupPassword() {
+  const password = els.authPassword.value;
+  const confirmation = els.authSignupConfirmPassword.value;
+  if (password.length < 6) {
+    setAuthMessage(ui("A senha deve ter no mÃ­nimo 6 caracteres.", "The password must be at least 6 characters."), "error");
+    els.authPassword.focus();
+    return false;
+  }
+  if (password !== confirmation) {
+    setAuthMessage(ui("As senhas nÃ£o conferem.", "The passwords do not match."), "error");
+    els.authSignupConfirmPassword.focus();
+    return false;
+  }
+  return true;
+}
+
 function setSyncStatus(status, message) {
   els.authButton.classList.remove("syncing", "sync-error");
   if (status === "syncing") els.authButton.classList.add("syncing");
@@ -1713,6 +1755,7 @@ async function createAccount() {
   if (!els.authForm.reportValidity()) return;
   const profile = validateSignupProfile();
   if (!profile) return;
+  if (!validateSignupPassword()) return;
   setAuthMessage(ui("Criando sua conta...", "Creating your account..."));
   els.createAccount.disabled = true;
 
@@ -1744,6 +1787,7 @@ async function createAccount() {
       activateAccountStorage(result.user.id);
       await saveUserProfile(result.user);
       els.authPassword.value = "";
+      els.authSignupConfirmPassword.value = "";
       updateAuthUi();
       await loadRemoteState();
       setAuthMessage("");
@@ -1759,6 +1803,10 @@ async function createAccount() {
 
 async function signIn(event) {
   event.preventDefault();
+  if (authSignupMode) {
+    await createAccount();
+    return;
+  }
   setAuthMessage("Entrando...");
 
   try {

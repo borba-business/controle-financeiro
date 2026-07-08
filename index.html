@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=58" />
+    <link rel="stylesheet" href="./styles.css?v=59" />
   </head>
   <body>
     <main class="app-shell">
@@ -601,9 +601,14 @@
             Senha
             <input id="authPassword" type="password" autocomplete="current-password" minlength="6" required />
           </label>
+          <label id="authSignupConfirmPasswordField" class="hidden" hidden>
+            Confirmar senha
+            <input id="authSignupConfirmPassword" type="password" autocomplete="new-password" minlength="6" />
+          </label>
           <p id="authMessage" class="auth-message" role="status"></p>
           <button id="forgotPassword" class="text-button auth-forgot" type="button">Esqueci minha senha</button>
           <div class="auth-actions">
+            <button id="backToSignIn" class="secondary hidden" type="button" hidden>Voltar</button>
             <button id="createAccount" class="secondary" type="button">Criar conta</button>
             <button id="signIn" class="primary" type="submit">Entrar</button>
           </div>
@@ -685,6 +690,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=58"></script>
+    <script src="./app.js?v=59"></script>
   </body>
 </html>
