@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=60" />
+    <link rel="stylesheet" href="./styles.css?v=61" />
   </head>
   <body>
     <main class="app-shell">
@@ -52,7 +52,6 @@
           <span aria-hidden="true"></span>
           <span aria-hidden="true"></span>
         </button>
-      </section>
 
       <section id="marketTicker" class="market-ticker" aria-label="Cotações do mercado financeiro">
         <div class="market-ticker-label" aria-hidden="true">
@@ -472,7 +471,21 @@
           <p>Entre e sincronize para editar seus dados.</p>
           <button id="utilityOpenAuth" class="secondary" type="button">Entrar e sincronizar</button>
         </div>
-        <form id="accountProfileForm" class="account-profile-form hidden" hidden>
+        <div id="utilityAccountSignedIn" class="utility-account-signed-in hidden" hidden>
+          <p>Atualize seus dados pessoais vinculados a esta conta.</p>
+          <button id="openAccountDialog" class="secondary" type="button">Editar conta</button>
+        </div>
+      </section>
+    <dialog id="accountDialog" class="account-dialog" aria-labelledby="accountDialogTitle">
+      <form id="accountProfileForm" class="account-profile-form account-dialog-content">
+        <div class="account-dialog-header">
+          <div>
+            <p class="eyebrow">Perfil</p>
+            <h2 id="accountDialogTitle">Conta</h2>
+          </div>
+          <button id="closeAccountDialog" class="icon-close" type="button" aria-label="Fechar dados da conta" title="Fechar">&times;</button>
+        </div>
+        <div class="account-dialog-body">
           <label>
             E-mail conectado
             <input id="profileEmail" type="email" readonly />
@@ -517,8 +530,9 @@
           </label>
           <p id="profileStatus" class="profile-status" role="status"></p>
           <button id="saveProfile" class="primary" type="submit">Salvar dados da conta</button>
-        </form>
-      </section>
+        </div>
+      </form>
+    </dialog>
       <nav class="utility-menu-actions" aria-label="Ações da planilha">
         <button id="exportCsv" class="utility-action" type="button">
           <span class="utility-action-icon" aria-hidden="true">CSV</span>
@@ -746,6 +760,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=60"></script>
+    <script src="./app.js?v=61"></script>
   </body>
 </html>

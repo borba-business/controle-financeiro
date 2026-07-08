@@ -220,7 +220,11 @@ const els = {
   utilityMenuClose: document.querySelector("#utilityMenuClose"),
   utilityMenuBackdrop: document.querySelector("#utilityMenuBackdrop"),
   utilityAccountSignedOut: document.querySelector("#utilityAccountSignedOut"),
+  utilityAccountSignedIn: document.querySelector("#utilityAccountSignedIn"),
   utilityOpenAuth: document.querySelector("#utilityOpenAuth"),
+  openAccountDialog: document.querySelector("#openAccountDialog"),
+  accountDialog: document.querySelector("#accountDialog"),
+  closeAccountDialog: document.querySelector("#closeAccountDialog"),
   accountProfileForm: document.querySelector("#accountProfileForm"),
   profileEmail: document.querySelector("#profileEmail"),
   profileFirstName: document.querySelector("#profileFirstName"),
@@ -660,6 +664,11 @@ function bindEvents() {
   els.utilityMenuClose.addEventListener("click", closeUtilityMenu);
   els.utilityMenuBackdrop.addEventListener("click", closeUtilityMenu);
   els.utilityOpenAuth?.addEventListener("click", openAuthFromUtilityMenu);
+  els.openAccountDialog?.addEventListener("click", openAccountDialog);
+  els.closeAccountDialog?.addEventListener("click", closeAccountDialog);
+  els.accountDialog?.addEventListener("click", (event) => {
+    if (event.target === els.accountDialog) closeAccountDialog();
+  });
   els.accountProfileForm?.addEventListener("submit", saveAccountProfile);
   els.profileCountry?.addEventListener("change", updateProfilePhoneDialCode);
   els.openBackupPanel.addEventListener("click", openBackupFromUtilityMenu);
@@ -1787,17 +1796,19 @@ async function loadAccountProfile() {
 }
 
 async function updateUtilityAccountUi() {
-  if (!els.utilityAccountSignedOut || !els.accountProfileForm) return;
+  if (!els.utilityAccountSignedOut || !els.utilityAccountSignedIn || !els.accountProfileForm) return;
   const connected = Boolean(authSession?.user);
   els.utilityAccountSignedOut.classList.toggle("hidden", connected);
-  els.accountProfileForm.classList.toggle("hidden", !connected);
-  els.accountProfileForm.hidden = !connected;
+  els.utilityAccountSignedOut.hidden = connected;
+  els.utilityAccountSignedIn.classList.toggle("hidden", !connected);
+  els.utilityAccountSignedIn.hidden = !connected;
   if (!connected) {
     setProfileStatus("");
+    closeAccountDialog();
     return;
   }
   fillProfileFormFromProfile(profileFromUser(authSession.user));
-  if (els.utilityMenu?.classList.contains("open")) {
+  if (els.utilityMenu?.classList.contains("open") || els.accountDialog?.open) {
     fillProfileFormFromProfile(await loadAccountProfile());
   }
 }
@@ -1805,6 +1816,21 @@ async function updateUtilityAccountUi() {
 function openAuthFromUtilityMenu() {
   closeUtilityMenu();
   openAuthDialog();
+}
+
+async function openAccountDialog() {
+  if (!authSession?.user) {
+    openAuthFromUtilityMenu();
+    return;
+  }
+  closeUtilityMenu();
+  fillProfileFormFromProfile(await loadAccountProfile());
+  setProfileStatus("");
+  els.accountDialog?.showModal();
+}
+
+function closeAccountDialog() {
+  if (els.accountDialog?.open) els.accountDialog.close();
 }
 
 async function saveAccountProfile(event) {

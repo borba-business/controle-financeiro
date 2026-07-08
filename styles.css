@@ -374,10 +374,61 @@ body.utility-menu-open {
 }
 
 .utility-account-signed-out p,
+.utility-account-signed-in p,
 .profile-status {
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.45;
+}
+
+.utility-account-signed-in {
+  display: grid;
+  gap: 12px;
+}
+
+.utility-account-signed-in p {
+  margin: 0;
+}
+
+.account-dialog {
+  width: min(720px, calc(100vw - 28px));
+  max-height: min(86vh, 780px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.account-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(8px);
+}
+
+.account-dialog-content {
+  gap: 0;
+  max-height: inherit;
+  overflow: auto;
+  padding: 26px;
+}
+
+.account-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.account-dialog-header h2 {
+  margin: 4px 0 0;
+  font-size: 1.55rem;
+}
+
+.account-dialog-body {
+  display: grid;
+  gap: 16px;
 }
 
 .account-profile-form,
