@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=61" />
+    <link rel="stylesheet" href="./styles.css?v=62" />
   </head>
   <body>
     <main class="app-shell">
@@ -52,6 +52,7 @@
           <span aria-hidden="true"></span>
           <span aria-hidden="true"></span>
         </button>
+      </section>
 
       <section id="marketTicker" class="market-ticker" aria-label="Cotações do mercado financeiro">
         <div class="market-ticker-label" aria-hidden="true">
@@ -476,6 +477,26 @@
           <button id="openAccountDialog" class="secondary" type="button">Editar conta</button>
         </div>
       </section>
+
+      <nav class="utility-menu-actions" aria-label="Ações da planilha">
+        <button id="exportCsv" class="utility-action" type="button">
+          <span class="utility-action-icon" aria-hidden="true">CSV</span>
+          <strong>Exportar CSV</strong>
+        </button>
+        <button id="openBackupPanel" class="utility-action" type="button">
+          <span class="utility-action-icon" aria-hidden="true">&#x21E9;</span>
+          <strong>Backup</strong>
+        </button>
+        <div class="utility-danger-zone">
+          <p>Ação irreversível</p>
+          <button id="clearData" class="utility-action utility-action-danger" type="button">
+            <span class="utility-action-icon" aria-hidden="true">!</span>
+            <strong>Limpar Planilha</strong>
+          </button>
+        </div>
+      </nav>
+    </aside>
+
     <dialog id="accountDialog" class="account-dialog" aria-labelledby="accountDialogTitle">
       <form id="accountProfileForm" class="account-profile-form account-dialog-content">
         <div class="account-dialog-header">
@@ -533,24 +554,6 @@
         </div>
       </form>
     </dialog>
-      <nav class="utility-menu-actions" aria-label="Ações da planilha">
-        <button id="exportCsv" class="utility-action" type="button">
-          <span class="utility-action-icon" aria-hidden="true">CSV</span>
-          <strong>Exportar CSV</strong>
-        </button>
-        <button id="openBackupPanel" class="utility-action" type="button">
-          <span class="utility-action-icon" aria-hidden="true">&#x21E9;</span>
-          <strong>Backup</strong>
-        </button>
-        <div class="utility-danger-zone">
-          <p>Ação irreversível</p>
-          <button id="clearData" class="utility-action utility-action-danger" type="button">
-            <span class="utility-action-icon" aria-hidden="true">!</span>
-            <strong>Limpar Planilha</strong>
-          </button>
-        </div>
-      </nav>
-    </aside>
 
     <dialog id="backupDialog" class="backup-dialog" aria-labelledby="backupDialogTitle">
       <div class="backup-dialog-content">
@@ -760,6 +763,7 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-    <script src="./app.js?v=61"></script>
+    <script src="./app.js?v=62"></script>
   </body>
 </html>
+
