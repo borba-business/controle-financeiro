@@ -455,7 +455,7 @@ body.utility-menu-open {
 
 .account-profile-form input,
 .account-profile-form select,
-.account-profile-form button {
+.account-profile-form button:not(.icon-close) {
   width: 100%;
   min-width: 0;
 }
